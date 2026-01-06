@@ -34,5 +34,5 @@ public class Plan extends BaseTenantEntity {
     private String description;
 
     @Column(name = "active", nullable = false)
-    private Boolean active = true;
+    private boolean active = true;
 }
