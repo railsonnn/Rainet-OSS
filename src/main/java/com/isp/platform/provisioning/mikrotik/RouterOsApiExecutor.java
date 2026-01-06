@@ -6,7 +6,7 @@ import me.legrange.mikrotik.ApiConnection;
 import me.legrange.mikrotik.MikrotikApiException;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import javax.net.SocketFactory;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -31,7 +31,8 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         try {
             log.info("Testing connection to router: {} ({})", router.getHostname(), router.getManagementAddress());
             
-            conn = ApiConnection.connect(router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
             conn.login(router.getApiUsername(), router.getApiPassword());
             
             log.info("Connection test successful for router: {}", router.getHostname());
@@ -56,20 +57,20 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         try {
             log.info("Applying script to router: {}", router.getHostname());
             
-            conn = ApiConnection.connect(router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
             conn.login(router.getApiUsername(), router.getApiPassword());
             
             // Create temporary script file on router
             String scriptName = generateScriptName();
             String fileName = scriptName + ".rsc";
             
-            // Upload script content to router via /file/set
-            // RouterOS API requires us to send the file content line by line
+            // Upload script content to router via /system/script
             uploadScriptToRouter(conn, fileName, script);
             
             // Execute the script using /import
             log.debug("Executing /import for script: {}", fileName);
-            conn.execute("/import", "file-name=" + fileName);
+            conn.execute("/import file-name=" + fileName);
             
             // Clean up temporary script file
             removeScriptFile(conn, fileName);
@@ -95,18 +96,24 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         try {
             log.info("Exporting compact configuration from router: {}", router.getHostname());
             
-            conn = ApiConnection.connect(router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
             conn.login(router.getApiUsername(), router.getApiPassword());
             
             // Execute /export compact command
-            List<Map<String, String>> result = conn.execute("/export", "compact=yes");
+            List<Map<String, String>> result = conn.execute("/export compact=yes");
             
             // Build the configuration string from the result
             StringBuilder config = new StringBuilder();
             for (Map<String, String> line : result) {
-                // The export command returns lines with a "line" key
+                // The export command returns lines with a "line" key or direct values
                 if (line.containsKey("line")) {
                     config.append(line.get("line")).append("\n");
+                } else {
+                    // Some results may have all values concatenated
+                    for (String value : line.values()) {
+                        config.append(value).append("\n");
+                    }
                 }
             }
             
@@ -130,7 +137,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
 
     /**
      * Upload script content to router as a file.
-     * Uses /file/print command to create file content.
+     * Uses /system/script to create the script, then exports to file.
      */
     private void uploadScriptToRouter(ApiConnection conn, String fileName, String scriptContent) 
             throws MikrotikApiException {
@@ -138,8 +145,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         log.debug("Uploading script '{}' to router ({} bytes)", fileName, scriptContent.length());
         
         // RouterOS API doesn't have a direct file upload command
-        // We need to use FTP or create the file through system commands
-        // For simplicity, we'll use the /system/script add approach
+        // We use the /system/script add approach to create the script
         
         // Add script as a system script, then export it to file
         String scriptName = fileName.replace(".rsc", "");
@@ -147,20 +153,20 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         try {
             // Remove existing script with same name if exists
             try {
-                conn.execute("/system/script/remove", "numbers=[find name=\"" + scriptName + "\"]");
+                List<Map<String, String>> existingScripts = conn.execute("/system/script/print where name=\"" + scriptName + "\"");
+                if (!existingScripts.isEmpty()) {
+                    conn.execute("/system/script/remove numbers=" + existingScripts.get(0).get(".id"));
+                }
             } catch (MikrotikApiException e) {
                 // Ignore if script doesn't exist
                 log.trace("Script {} doesn't exist yet, continuing", scriptName);
             }
             
-            // Add the script
-            conn.execute("/system/script/add", 
-                "name=" + scriptName, 
-                "source=" + scriptContent);
+            // Add the script with source content
+            conn.execute("/system/script/add name=" + scriptName + " source=\"" + scriptContent.replace("\"", "\\\"") + "\"");
             
             // Export the script to a file
-            conn.execute("/system/script/export", 
-                "file=" + scriptName);
+            conn.execute("/system/script/export file=" + scriptName);
             
         } catch (MikrotikApiException e) {
             log.error("Failed to upload script to router", e);
@@ -176,12 +182,18 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         
         try {
             // Remove the file
-            conn.execute("/file/remove", "numbers=[find name=\"" + fileName + "\"]");
+            List<Map<String, String>> files = conn.execute("/file/print where name=\"" + fileName + "\"");
+            if (!files.isEmpty()) {
+                conn.execute("/file/remove numbers=" + files.get(0).get(".id"));
+            }
             
             // Also remove the system script
             String scriptName = fileName.replace(".rsc", "");
             try {
-                conn.execute("/system/script/remove", "numbers=[find name=\"" + scriptName + "\"]");
+                List<Map<String, String>> scripts = conn.execute("/system/script/print where name=\"" + scriptName + "\"");
+                if (!scripts.isEmpty()) {
+                    conn.execute("/system/script/remove numbers=" + scripts.get(0).get(".id"));
+                }
             } catch (MikrotikApiException e) {
                 log.trace("System script cleanup failed, may not exist", e);
             }
