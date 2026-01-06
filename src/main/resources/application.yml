@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: rainet-oss
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rainet
+    username: rainet
+    password: rainet
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.lob.non_contextual_creation: true
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+security:
+  jwt:
+    secret: "change-me-secret-change-me-secret-change-me"
+    access-ttl-minutes: 15
+    refresh-ttl-minutes: 43200
+
+logging:
+  level:
+    root: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+
+logging:
+  level:
+    root: INFO

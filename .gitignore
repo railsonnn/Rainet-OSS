@@ -1,0 +1,11 @@
+.idea/
+.vscode/
+target/
+*.iml
+*.log
+*.tmp
+*.swp
+hs_err_pid*
+.DS_Store
+node_modules/
+.env
