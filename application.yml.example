@@ -1,0 +1,267 @@
+# Rainet OSS/BSS Platform Configuration Template
+# Copy to application.yml or application.properties and fill in your values
+
+spring:
+  application:
+    name: rainet-oss
+  profiles:
+    active: dev
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rainet_oss
+    username: rainet_user
+    password: change_me_in_production
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQL10Dialect
+        format_sql: true
+        jdbc:
+          batch_size: 10
+  
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://your-auth-provider.com
+          jwk-set-uri: https://your-auth-provider.com/.well-known/jwks.json
+  
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+
+# MikroTik Router Configuration
+mikrotik:
+  api:
+    timeout-seconds: 30
+    retry-attempts: 3
+    retry-delay-ms: 1000
+
+# RADIUS Server Configuration
+radius:
+  server: 127.0.0.1
+  port: 1812
+  secret: change_me_in_production
+  timeout-seconds: 5
+  # MikroTik-specific attribute for rate limiting
+  mikrotik-rate-limit-attribute: Mikrotik-Rate-Limit
+
+# PIX Payment Gateway Configuration (Choose one)
+pix:
+  # Options: asaas, gerencianet
+  gateway: asaas
+
+asaas:
+  api-key: ${ASAAS_API_KEY:}
+  api-url: https://api.asaas.com/v3
+  environment: production
+
+gerencianet:
+  client-id: ${GERENCIANET_CLIENT_ID:}
+  client-secret: ${GERENCIANET_CLIENT_SECRET:}
+  environment: production
+
+# Webhook Configuration
+app:
+  webhook-url: https://your-domain.com
+  webhook-secret: change_me_in_production
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:change_me_in_production_with_long_random_string}
+  expiration-ms: 86400000  # 24 hours
+  refresh-expiration-ms: 604800000  # 7 days
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.isp.platform: DEBUG
+    org.springframework: WARN
+    org.springframework.security: DEBUG
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/rainet-oss.log
+    max-size: 10MB
+    max-history: 30
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+    min-response-size: 1024
+
+# Actuator (Monitoring)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Tenant Configuration
+tenants:
+  isolation-mode: strict  # none, basic, strict
+  default-quota:
+    routers: 10
+    customers: 1000
+    invoices-per-month: 5000
+
+# Feature Flags
+features:
+  multi-tenancy:
+    enabled: true
+  rbac:
+    enabled: true
+  audit-logging:
+    enabled: true
+  snapshots:
+    enabled: true
+  rollback:
+    enabled: true
+  pix-payments:
+    enabled: true
+  freeradius-auth:
+    enabled: true
+
+# Email Configuration (for notifications)
+mail:
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+  from: noreply@rainet-isp.com
+
+# Default Plans (bootstrap data)
+plans:
+  - name: STARTER
+    description: Entry level plan
+    upload-mbps: 3
+    download-mbps: 10
+    price-monthly: 29.90
+    currency: BRL
+  
+  - name: PROFESSIONAL
+    description: Professional plan
+    upload-mbps: 5
+    download-mbps: 50
+    price-monthly: 79.90
+    currency: BRL
+  
+  - name: ENTERPRISE
+    description: Business plan
+    upload-mbps: 10
+    download-mbps: 100
+    price-monthly: 199.90
+    currency: BRL
+
+---
+
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+  
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    com.isp.platform: INFO
+
+server:
+  port: 8080
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE_PATH:}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
+    key-store-type: PKCS12
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
+---
+
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+  
+  h2:
+    console:
+      enabled: true
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+logging:
+  level:
+    root: INFO
+    com.isp.platform: DEBUG
+    org.springframework.security: DEBUG
+
+server:
+  port: 8080
+
+---
+
+# Test Profile
+spring:
+  config:
+    activate:
+      on-profile: test
+  
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+logging:
+  level:
+    root: WARN
+    com.isp.platform: DEBUG
