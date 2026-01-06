@@ -68,9 +68,10 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             // Upload script content to router via /system/script
             uploadScriptToRouter(conn, fileName, script);
             
-            // Execute the script using /import
+            // Execute the script using /import with proper parameter formatting
             log.debug("Executing /import for script: {}", fileName);
-            conn.execute("/import file-name=" + fileName);
+            String importCommand = String.format("/import =file-name=%s", fileName);
+            conn.execute(importCommand);
             
             // Clean up temporary script file
             removeScriptFile(conn, fileName);
@@ -101,18 +102,19 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             conn.login(router.getApiUsername(), router.getApiPassword());
             
             // Execute /export compact command
-            List<Map<String, String>> result = conn.execute("/export compact=yes");
+            // The MikroTik API returns each line of the export as a separate result entry
+            List<Map<String, String>> result = conn.execute("/export =compact=yes");
             
             // Build the configuration string from the result
+            // Each result entry in the list represents a line of the exported configuration
             StringBuilder config = new StringBuilder();
-            for (Map<String, String> line : result) {
-                // The export command returns lines with a "line" key or direct values
-                if (line.containsKey("line")) {
-                    config.append(line.get("line")).append("\n");
-                } else {
-                    // Some results may have all values concatenated
-                    for (String value : line.values()) {
-                        config.append(value).append("\n");
+            for (Map<String, String> entry : result) {
+                // RouterOS API returns command output in the map values
+                // We collect all non-metadata values to reconstruct the export
+                for (Map.Entry<String, String> field : entry.entrySet()) {
+                    // Skip metadata fields that start with '.'
+                    if (!field.getKey().startsWith(".")) {
+                        config.append(field.getValue()).append("\n");
                     }
                 }
             }
@@ -144,18 +146,23 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         
         log.debug("Uploading script '{}' to router ({} bytes)", fileName, scriptContent.length());
         
+        // Validate fileName to prevent command injection
+        String scriptName = fileName.replace(".rsc", "");
+        if (!scriptName.matches("^rainet_[0-9]{8}-[0-9]{6}_[a-f0-9]{8}$")) {
+            throw new IllegalArgumentException("Invalid script name format");
+        }
+        
         // RouterOS API doesn't have a direct file upload command
         // We use the /system/script add approach to create the script
-        
-        // Add script as a system script, then export it to file
-        String scriptName = fileName.replace(".rsc", "");
         
         try {
             // Remove existing script with same name if exists
             try {
-                List<Map<String, String>> existingScripts = conn.execute("/system/script/print where name=\"" + scriptName + "\"");
-                if (!existingScripts.isEmpty()) {
-                    conn.execute("/system/script/remove numbers=" + existingScripts.get(0).get(".id"));
+                List<Map<String, String>> existingScripts = conn.execute(
+                    String.format("/system/script/print ?name=%s", scriptName));
+                if (!existingScripts.isEmpty() && existingScripts.get(0).containsKey(".id")) {
+                    String scriptId = existingScripts.get(0).get(".id");
+                    conn.execute(String.format("/system/script/remove =.id=%s", scriptId));
                 }
             } catch (MikrotikApiException e) {
                 // Ignore if script doesn't exist
@@ -163,10 +170,15 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             }
             
             // Add the script with source content
-            conn.execute("/system/script/add name=" + scriptName + " source=\"" + scriptContent.replace("\"", "\\\"") + "\"");
+            // Note: The MikroTik API handles parameter escaping internally
+            // We construct the command using the proper format with = prefix for parameters
+            String addCommand = String.format("/system/script/add =name=%s =source=%s", 
+                scriptName, scriptContent);
+            conn.execute(addCommand);
             
             // Export the script to a file
-            conn.execute("/system/script/export file=" + scriptName);
+            String exportCommand = String.format("/system/script/export =file=%s", scriptName);
+            conn.execute(exportCommand);
             
         } catch (MikrotikApiException e) {
             log.error("Failed to upload script to router", e);
@@ -180,19 +192,29 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     private void removeScriptFile(ApiConnection conn, String fileName) {
         log.debug("Removing script file '{}' from router", fileName);
         
+        // Validate fileName to prevent command injection
+        String scriptName = fileName.replace(".rsc", "");
+        if (!scriptName.matches("^rainet_[0-9]{8}-[0-9]{6}_[a-f0-9]{8}$")) {
+            log.warn("Invalid script name format for cleanup: {}", fileName);
+            return;
+        }
+        
         try {
             // Remove the file
-            List<Map<String, String>> files = conn.execute("/file/print where name=\"" + fileName + "\"");
-            if (!files.isEmpty()) {
-                conn.execute("/file/remove numbers=" + files.get(0).get(".id"));
+            List<Map<String, String>> files = conn.execute(
+                String.format("/file/print ?name=%s", fileName));
+            if (!files.isEmpty() && files.get(0).containsKey(".id")) {
+                String fileId = files.get(0).get(".id");
+                conn.execute(String.format("/file/remove =.id=%s", fileId));
             }
             
             // Also remove the system script
-            String scriptName = fileName.replace(".rsc", "");
             try {
-                List<Map<String, String>> scripts = conn.execute("/system/script/print where name=\"" + scriptName + "\"");
-                if (!scripts.isEmpty()) {
-                    conn.execute("/system/script/remove numbers=" + scripts.get(0).get(".id"));
+                List<Map<String, String>> scripts = conn.execute(
+                    String.format("/system/script/print ?name=%s", scriptName));
+                if (!scripts.isEmpty() && scripts.get(0).containsKey(".id")) {
+                    String scriptId = scripts.get(0).get(".id");
+                    conn.execute(String.format("/system/script/remove =.id=%s", scriptId));
                 }
             } catch (MikrotikApiException e) {
                 log.trace("System script cleanup failed, may not exist", e);
