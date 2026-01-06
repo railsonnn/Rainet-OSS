@@ -42,7 +42,7 @@ public class ProvisioningService {
     public UUID apply(ProvisioningRequest request, String actor) {
         Router router = findRouterForTenant(request.routerId());
         String script = scriptGenerator.generateProvisioningScript(router);
-        executor.apply(script);
+        executor.applyScript(router, script);
 
         ConfigSnapshot snapshot = new ConfigSnapshot();
         snapshot.setRouter(router);
@@ -59,10 +59,12 @@ public class ProvisioningService {
         ConfigSnapshot snapshot = snapshotRepository.findById(snapshotId)
                 .filter(s -> tenantId.equals(s.getTenantId()))
                 .orElseThrow(() -> new ApiException("Snapshot not found"));
-        executor.apply(snapshot.getConfigScript());
+        
+        Router router = snapshot.getRouter();
+        executor.applyScript(router, snapshot.getConfigScript());
 
         ConfigSnapshot rollbackLog = new ConfigSnapshot();
-        rollbackLog.setRouter(snapshot.getRouter());
+        rollbackLog.setRouter(router);
         rollbackLog.setConfigScript(snapshot.getConfigScript());
         rollbackLog.setDescription("Rollback by " + actor);
         rollbackLog.setAppliedBy(actor);
