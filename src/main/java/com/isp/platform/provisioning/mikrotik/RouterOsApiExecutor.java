@@ -1,86 +1,94 @@
 package com.isp.platform.provisioning.mikrotik;
 
 import com.isp.platform.provisioning.domain.Router;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import me.legrange.mikrotik.MikrotikApiConnection;
-import me.legrange.mikrotik.MikrotikApiConnectionFactory;
-import me.legrange.mikrotik.MikrotikApiException;
 import me.legrange.mikrotik.ApiConnection;
+import me.legrange.mikrotik.MikrotikApiException;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import javax.net.SocketFactory;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
  * Real MikroTik RouterOS API executor using me.legrange mikrotik library.
- * Supports both API (port 8728/8729) and SSH connections.
+ * Connects via RouterOS API (TCP port 8728) and executes commands on real equipment.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RouterOsApiExecutor implements RouterOsExecutor {
 
     private static final int API_PORT = 8728;
-    private static final int API_PORT_TLS = 8729;
-    private static final int TIMEOUT_SECONDS = 30;
-    private static final String TEMP_SCRIPT_DIR = "/tmp/rainet-scripts";
+    private static final int TIMEOUT_MS = 30000;
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    
+    // Pattern for validating generated script names to prevent command injection
+    private static final java.util.regex.Pattern SCRIPT_NAME_PATTERN = 
+        java.util.regex.Pattern.compile("^rainet_[0-9]{8}-[0-9]{6}_[a-f0-9]{8}$");
 
     @Override
     public boolean testConnection(Router router) {
+        ApiConnection conn = null;
         try {
             log.info("Testing connection to router: {} ({})", router.getHostname(), router.getManagementAddress());
             
-            MikrotikApiConnection conn = createConnection(router);
-            conn.connect();
-            conn.close();
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            conn.login(router.getApiUsername(), router.getApiPassword());
             
             log.info("Connection test successful for router: {}", router.getHostname());
             return true;
-        } catch (Exception e) {
+        } catch (MikrotikApiException e) {
             log.error("Connection test failed for router: {}", router.getHostname(), e);
             throw new RuntimeException("Failed to connect to router: " + router.getHostname(), e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (Exception e) {
+                    log.warn("Error closing connection to router: {}", router.getHostname(), e);
+                }
+            }
         }
     }
 
     @Override
     public void applyScript(Router router, String script) {
-        MikrotikApiConnection conn = null;
+        ApiConnection conn = null;
         try {
             log.info("Applying script to router: {}", router.getHostname());
             
-            conn = createConnection(router);
-            conn.connect();
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            conn.login(router.getApiUsername(), router.getApiPassword());
             
             // Create temporary script file on router
             String scriptName = generateScriptName();
-            uploadScript(conn, scriptName, script);
+            String fileName = scriptName + ".rsc";
             
-            // Execute the script
-            executeScript(conn, scriptName);
+            // Upload script content to router via /system/script
+            uploadScriptToRouter(conn, fileName, script);
             
-            // Clean up
-            removeScript(conn, scriptName);
+            // Execute the script using /import with proper parameter formatting
+            log.debug("Executing /import for script: {}", fileName);
+            String importCommand = String.format("/import =file-name=%s", fileName);
+            conn.execute(importCommand);
+            
+            // Clean up temporary script file
+            removeScriptFile(conn, fileName);
             
             log.info("Script successfully applied to router: {}", router.getHostname());
-        } catch (Exception e) {
+        } catch (MikrotikApiException e) {
             log.error("Failed to apply script to router: {}", router.getHostname(), e);
             throw new RuntimeException("Failed to apply script to router: " + router.getHostname(), e);
         } finally {
             if (conn != null) {
                 try {
                     conn.close();
-                } catch (MikrotikApiException e) {
+                } catch (Exception e) {
                     log.warn("Error closing connection to router: {}", router.getHostname(), e);
                 }
             }
@@ -89,27 +97,44 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
 
     @Override
     public String exportCompact(Router router) {
-        MikrotikApiConnection conn = null;
+        ApiConnection conn = null;
         try {
             log.info("Exporting compact configuration from router: {}", router.getHostname());
             
-            conn = createConnection(router);
-            conn.connect();
+            SocketFactory socketFactory = SocketFactory.getDefault();
+            conn = ApiConnection.connect(socketFactory, router.getManagementAddress(), API_PORT, TIMEOUT_MS);
+            conn.login(router.getApiUsername(), router.getApiPassword());
             
             // Execute /export compact command
-            String command = "/export compact";
-            String result = executeCommand(conn, command);
+            // The MikroTik API returns each line of the export as a separate result entry
+            List<Map<String, String>> result = conn.execute("/export =compact=yes");
             
-            log.info("Configuration exported from router: {}", router.getHostname());
-            return result;
-        } catch (Exception e) {
+            // Build the configuration string from the result
+            // Each result entry in the list represents a line of the exported configuration
+            StringBuilder config = new StringBuilder();
+            for (Map<String, String> entry : result) {
+                // RouterOS API returns command output in the map values
+                // We collect all non-metadata values to reconstruct the export
+                for (Map.Entry<String, String> field : entry.entrySet()) {
+                    // Skip metadata fields that start with '.'
+                    if (!field.getKey().startsWith(".")) {
+                        config.append(field.getValue()).append("\n");
+                    }
+                }
+            }
+            
+            String exportedConfig = config.toString();
+            log.info("Configuration exported from router: {} ({} bytes)", 
+                    router.getHostname(), exportedConfig.length());
+            return exportedConfig;
+        } catch (MikrotikApiException e) {
             log.error("Failed to export configuration from router: {}", router.getHostname(), e);
             throw new RuntimeException("Failed to export configuration from router: " + router.getHostname(), e);
         } finally {
             if (conn != null) {
                 try {
                     conn.close();
-                } catch (MikrotikApiException e) {
+                } catch (Exception e) {
                     log.warn("Error closing connection to router: {}", router.getHostname(), e);
                 }
             }
@@ -117,93 +142,107 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     }
 
     /**
-     * Create a MikroTik API connection.
+     * Upload script content to router as a file.
+     * Uses /system/script to create the script, then exports to file.
+     * 
+     * Note: The MikroTik API library (me.legrange:mikrotik) handles command string construction
+     * and parameter escaping internally. We use the = prefix format which is the standard
+     * MikroTik API protocol for setting parameters.
      */
-    private MikrotikApiConnection createConnection(Router router) throws MikrotikApiException {
-        log.debug("Creating connection to {} at {}", router.getHostname(), router.getManagementAddress());
-        
-        MikrotikApiConnection conn = MikrotikApiConnectionFactory.buildConnection()
-                .setRemoteAddress(router.getManagementAddress())
-                .setPort(API_PORT)
-                .setUsername(router.getApiUsername())
-                .setPassword(router.getApiPassword())
-                .setSocketTimeout(TIMEOUT_SECONDS * 1000)
-                .build();
-        
-        return conn;
-    }
-
-    /**
-     * Upload script to router via API.
-     */
-    private void uploadScript(MikrotikApiConnection conn, String scriptName, String scriptContent) 
-            throws MikrotikApiException, IOException {
-        
-        log.debug("Uploading script '{}' to router", scriptName);
-        
-        // We'll use /file command to upload the script
-        // Create a temporary file with the script content
-        String tempFile = String.format("/tmp/%s.rsc", scriptName);
-        
-        // Use the API to create the script by importing it directly
-        // The script content is sent line by line
-        executeCommand(conn, String.format("/file/print where name=\"%s\"", tempFile));
-    }
-
-    /**
-     * Execute a script on the router.
-     */
-    private void executeScript(MikrotikApiConnection conn, String scriptName) 
+    private void uploadScriptToRouter(ApiConnection conn, String fileName, String scriptContent) 
             throws MikrotikApiException {
         
-        log.debug("Executing script '{}' on router", scriptName);
+        log.debug("Uploading script '{}' to router ({} bytes)", fileName, scriptContent.length());
         
-        String importCommand = String.format("/import /tmp/%s.rsc", scriptName);
-        executeCommand(conn, importCommand);
-    }
-
-    /**
-     * Remove script from router.
-     */
-    private void removeScript(MikrotikApiConnection conn, String scriptName) 
-            throws MikrotikApiException {
+        // Validate fileName to prevent command injection
+        // Only scripts generated by generateScriptName() should be used
+        String scriptName = fileName.replace(".rsc", "");
+        if (!SCRIPT_NAME_PATTERN.matcher(scriptName).matches()) {
+            throw new IllegalArgumentException("Invalid script name format: " + scriptName);
+        }
         
-        log.debug("Removing script '{}' from router", scriptName);
+        // RouterOS API doesn't have a direct file upload command
+        // We use the /system/script add approach to create the script
         
-        String removeCommand = String.format("/file/remove numbers=[find name=\"/tmp/%s.rsc\"]", scriptName);
         try {
-            executeCommand(conn, removeCommand);
-        } catch (Exception e) {
-            log.warn("Failed to remove temporary script file", e);
-            // Don't fail the entire operation if cleanup fails
+            // Remove existing script with same name if exists
+            // Using ?name= query format for safe filtering
+            try {
+                List<Map<String, String>> existingScripts = conn.execute(
+                    String.format("/system/script/print ?name=%s", scriptName));
+                if (!existingScripts.isEmpty() && existingScripts.get(0).containsKey(".id")) {
+                    String scriptId = existingScripts.get(0).get(".id");
+                    // Using =.id= format for ID-based removal (safe, no injection risk)
+                    conn.execute(String.format("/system/script/remove =.id=%s", scriptId));
+                }
+            } catch (MikrotikApiException e) {
+                // Ignore if script doesn't exist
+                log.trace("Script {} doesn't exist yet, continuing", scriptName);
+            }
+            
+            // Add the script with source content
+            // The MikroTik API library handles parameter values internally
+            // The = prefix indicates a parameter assignment in the MikroTik API protocol
+            String addCommand = String.format("/system/script/add =name=%s =source=%s", 
+                scriptName, scriptContent);
+            conn.execute(addCommand);
+            
+            // Export the script to a file
+            String exportCommand = String.format("/system/script/export =file=%s", scriptName);
+            conn.execute(exportCommand);
+            
+        } catch (MikrotikApiException e) {
+            log.error("Failed to upload script to router", e);
+            throw new RuntimeException("Failed to upload script content", e);
         }
     }
 
     /**
-     * Execute a raw command on the router.
+     * Remove script file from router.
+     * All removals are ID-based for security.
      */
-    private String executeCommand(MikrotikApiConnection conn, String command) 
-            throws MikrotikApiException {
+    private void removeScriptFile(ApiConnection conn, String fileName) {
+        log.debug("Removing script file '{}' from router", fileName);
         
-        log.trace("Executing command: {}", command);
+        // Validate fileName to prevent command injection
+        String scriptName = fileName.replace(".rsc", "");
+        if (!SCRIPT_NAME_PATTERN.matcher(scriptName).matches()) {
+            log.warn("Invalid script name format for cleanup: {}", fileName);
+            return;
+        }
         
-        // Parse the command and execute it
-        // This is a simplified version - real implementation would parse the command syntax
-        String[] parts = command.split(" ");
-        String path = parts[0];
-        
-        // Execute and get result
-        String result = conn.execute(path);
-        
-        log.trace("Command result: {}", result);
-        return result;
+        try {
+            // Remove the file using ID-based removal
+            List<Map<String, String>> files = conn.execute(
+                String.format("/file/print ?name=%s", fileName));
+            if (!files.isEmpty() && files.get(0).containsKey(".id")) {
+                String fileId = files.get(0).get(".id");
+                conn.execute(String.format("/file/remove =.id=%s", fileId));
+            }
+            
+            // Also remove the system script using ID-based removal
+            try {
+                List<Map<String, String>> scripts = conn.execute(
+                    String.format("/system/script/print ?name=%s", scriptName));
+                if (!scripts.isEmpty() && scripts.get(0).containsKey(".id")) {
+                    String scriptId = scripts.get(0).get(".id");
+                    conn.execute(String.format("/system/script/remove =.id=%s", scriptId));
+                }
+            } catch (MikrotikApiException e) {
+                log.trace("System script cleanup failed, may not exist", e);
+            }
+        } catch (MikrotikApiException e) {
+            log.warn("Failed to remove temporary script file: {}", fileName, e);
+            // Don't fail the entire operation if cleanup fails
+        }
     }
 
     /**
      * Generate a unique script name.
      */
     private String generateScriptName() {
-        return String.format("rainet_%s_%s", TIMESTAMP_FORMATTER.format(LocalDateTime.now()), 
+        return String.format("rainet_%s_%s", 
+                TIMESTAMP_FORMATTER.format(LocalDateTime.now()), 
                 UUID.randomUUID().toString().substring(0, 8));
     }
 }

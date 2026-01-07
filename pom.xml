@@ -88,11 +88,14 @@
             <version>${mikrotik.version}</version>
         </dependency>
         <!-- RADIUS Client -->
+        <!-- TODO: Find alternative RADIUS library or fix repository -->
+        <!--
         <dependency>
             <groupId>net.jradius</groupId>
             <artifactId>jradius-core</artifactId>
             <version>1.2.7</version>
         </dependency>
+        -->
         <!-- HTTP Client for PIX/Billing Integration -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -133,12 +136,7 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>5.2.1</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- Mockito is included via spring-boot-starter-test -->
     </dependencies>
 
     <build>

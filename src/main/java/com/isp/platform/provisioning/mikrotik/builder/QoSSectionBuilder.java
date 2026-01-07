@@ -6,6 +6,7 @@ import java.util.List;
 
 /**
  * Builds QoS (Quality of Service) configuration section.
+ * Uses idempotent commands with comment-based identification.
  */
 @Component
 public class QoSSectionBuilder {
@@ -18,29 +19,38 @@ public class QoSSectionBuilder {
         }
         
         sb.append("# Quality of Service Configuration\n");
+        sb.append("# Idempotent: removes rules by comment before adding\n");
         
         // Queue trees for traffic shaping
         sb.append("/queue/tree\n");
+        sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /queue/tree remove $rule }\n");
         
         if (config.getDefaultBandwidthMbps() > 0) {
-            sb.append(String.format("add name=global-root parent=global-out max-limit=%dM comment=\"Global bandwidth limit\"\n",
+            sb.append(String.format("add name=global-root parent=global-out max-limit=%dM comment=\"Rainet: Global bandwidth\"\n",
                 config.getDefaultBandwidthMbps()));
         }
         
         // Add QoS profiles
         if (config.getQosProfiles() != null && !config.getQosProfiles().isEmpty()) {
             sb.append("/queue/type\n");
+            sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /queue/type remove $rule }\n");
             
             for (RouterOsConfig.QoSProfile profile : config.getQosProfiles()) {
-                sb.append(String.format("add name=%s priority=%d\n", 
-                    profile.getProfileName(), profile.getPriorityLevel()));
+                sb.append(String.format("add name=%s kind=pcq pcq-rate=%dM priority=%d comment=\"Rainet: QoS profile\"\n", 
+                    profile.getProfileName(), profile.getBandwidthMbps(), profile.getPriorityLevel()));
             }
         }
         
         // Simple traffic marking for QoS
         sb.append("/ip/firewall/mangle\n");
-        sb.append("add action=mark-connection chain=forward in-interface=ether1+ out-interface=ether2+ new-connection-mark=download comment=\"Mark download traffic\"\n");
-        sb.append("add action=mark-connection chain=forward in-interface=ether2+ out-interface=ether1 new-connection-mark=upload comment=\"Mark upload traffic\"\n");
+        sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /ip/firewall/mangle remove $rule }\n");
+        
+        if (config.getWanInterface() != null && config.getBridgeInterface() != null) {
+            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=download comment=\"Rainet: Mark download\"\n",
+                config.getWanInterface(), config.getBridgeInterface()));
+            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=upload comment=\"Rainet: Mark upload\"\n",
+                config.getBridgeInterface(), config.getWanInterface()));
+        }
         
         return sb.toString();
     }

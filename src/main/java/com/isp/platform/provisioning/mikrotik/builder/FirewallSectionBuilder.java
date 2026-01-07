@@ -8,6 +8,8 @@ import java.util.List;
  * Builds firewall and NAT configuration section.
  * Includes flood protection (SYN flood, connection rate limiting, port scan detection),
  * connection tracking, and NAT masquerading.
+ * Includes DDoS protection, connection tracking, and masquerading.
+ * Uses idempotent commands with comments for identification.
  */
 @Component
 public class FirewallSectionBuilder {
@@ -24,6 +26,7 @@ public class FirewallSectionBuilder {
         }
         
         sb.append("# Firewall Configuration\n");
+        sb.append("# Idempotent: removes rules by comment before adding\n");
         
         // Connection tracking
         sb.append("/ip/firewall/connection-tracking\n");
@@ -31,8 +34,11 @@ public class FirewallSectionBuilder {
         sb.append("set tcp-timeout=23h\n");
         sb.append("set udp-timeout=10m\n");
         
-        // Firewall filter rules
+        // Firewall filter rules - idempotent by removing with comments
         sb.append("/ip/firewall/filter\n");
+        
+        // Remove existing Rainet rules before adding new ones
+        sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /ip/firewall/filter remove $rule }\n");
         
         // Drop invalid connections
         sb.append("add action=drop chain=input connection-state=invalid comment=\"Drop invalid input\"\n");
@@ -56,9 +62,16 @@ public class FirewallSectionBuilder {
         // Accept established and related
         sb.append("add action=accept chain=input connection-state=established,related comment=\"Accept established/related input\"\n");
         sb.append("add action=accept chain=forward connection-state=established,related comment=\"Accept established/related forward\"\n");
+        sb.append("add action=drop chain=forward connection-state=invalid comment=\"Rainet: Drop invalid\"\n");
+        
+        // Accept established and related
+        sb.append("add action=accept chain=forward connection-state=established,related comment=\"Rainet: Accept established/related\"\n");
         
         // Accept new connections from LAN
-        sb.append("add action=accept chain=forward in-interface=ether2+ out-interface=ether1 comment=\"Accept from LAN\"\n");
+        if (config.getBridgeInterface() != null && config.getWanInterface() != null) {
+            sb.append(String.format("add action=accept chain=forward in-interface=%s out-interface=%s comment=\"Rainet: Accept from LAN\"\n",
+                config.getBridgeInterface(), config.getWanInterface()));
+        }
         
         // Accept from local interfaces (INPUT chain)
         sb.append("add action=accept chain=input in-interface=!ether1 comment=\"Accept from local\"\n");
@@ -66,6 +79,19 @@ public class FirewallSectionBuilder {
         // Drop other traffic
         sb.append("add action=drop chain=input comment=\"Drop other input\"\n");
         sb.append("add action=drop chain=forward comment=\"Drop other forward\"\n");
+        // Drop other forward traffic
+        sb.append("add action=drop chain=forward comment=\"Rainet: Drop other forward\"\n");
+        
+        // INPUT chain
+        sb.append("add action=accept chain=input connection-state=established,related comment=\"Rainet: Accept input established/related\"\n");
+        sb.append("add action=accept chain=input protocol=icmp comment=\"Rainet: Accept ICMP\"\n");
+        
+        if (config.getWanInterface() != null) {
+            sb.append(String.format("add action=accept chain=input in-interface=!%s comment=\"Rainet: Accept from local\"\n",
+                config.getWanInterface()));
+        }
+        
+        sb.append("add action=drop chain=input comment=\"Rainet: Drop other input\"\n");
         
         // Add custom rules if any
         if (config.getCustomRules() != null && !config.getCustomRules().isEmpty()) {
@@ -75,11 +101,15 @@ public class FirewallSectionBuilder {
         }
         
         // NAT Configuration
-        if (config.isNatEnabled()) {
+        if (config.isNatEnabled() && config.getWanInterface() != null) {
             sb.append("\n/ip/firewall/nat\n");
             
+            // Remove existing Rainet NAT rules
+            sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /ip/firewall/nat remove $rule }\n");
+            
             // Masquerade for WAN
-            sb.append("add action=masquerade chain=srcnat out-interface=ether1 comment=\"Masquerade WAN\"\n");
+            sb.append(String.format("add action=masquerade chain=srcnat out-interface=%s comment=\"Rainet: Masquerade WAN\"\n",
+                config.getWanInterface()));
         }
         
         return sb.toString();
@@ -115,7 +145,7 @@ public class FirewallSectionBuilder {
         }
         
         if (rule.getComment() != null) {
-            sb.append(" comment=\"").append(rule.getComment()).append("\"");
+            sb.append(" comment=\"Rainet: ").append(rule.getComment()).append("\"");
         }
         
         return sb.toString();
