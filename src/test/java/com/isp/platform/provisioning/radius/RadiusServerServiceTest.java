@@ -121,8 +121,8 @@ class RadiusServerServiceTest {
         
         when(customerRepository.findById(any(UUID.class)))
                 .thenReturn(Optional.empty());
-        when(customerRepository.findAll())
-                .thenReturn(Arrays.asList());
+        when(customerRepository.findByDocument("nonexistent"))
+                .thenReturn(Optional.empty());
 
         // When
         RadiusAuthRequest.RadiusAuthResponse response = radiusServerService.authenticate(request);
@@ -168,8 +168,8 @@ class RadiusServerServiceTest {
         
         when(customerRepository.findById(any(UUID.class)))
                 .thenReturn(Optional.empty());
-        when(customerRepository.findAll())
-                .thenReturn(Arrays.asList(activeCustomer));
+        when(customerRepository.findByDocument(document))
+                .thenReturn(Optional.of(activeCustomer));
 
         // When
         RadiusAuthRequest.RadiusAuthResponse response = radiusServerService.authenticate(request);

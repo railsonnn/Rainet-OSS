@@ -16,6 +16,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     @Query("SELECT i FROM Invoice i WHERE i.status = :status AND i.dueDate < :currentDate")
     List<Invoice> findOverdueInvoices(@Param("status") InvoiceStatus status, @Param("currentDate") LocalDate currentDate);
     
-    @Query("SELECT i FROM Invoice i WHERE i.customerId = :customerId AND i.status IN ('PENDING', 'OVERDUE') AND i.dueDate < :currentDate")
+    @Query("SELECT i FROM Invoice i WHERE i.customerId = :customerId AND i.status IN (com.isp.platform.billing.domain.InvoiceStatus.PENDING, com.isp.platform.billing.domain.InvoiceStatus.OVERDUE) AND i.dueDate < :currentDate")
     List<Invoice> findOverdueInvoicesByCustomer(@Param("customerId") String customerId, @Param("currentDate") LocalDate currentDate);
 }

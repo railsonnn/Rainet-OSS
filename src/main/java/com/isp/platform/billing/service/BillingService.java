@@ -51,7 +51,6 @@ public class BillingService {
         
         // Mark invoice as paid
         invoice.setStatus(InvoiceStatus.PAID);
-        invoiceRepository.save(invoice);
         
         log.info("Invoice {} marked as PAID", invoiceId);
         

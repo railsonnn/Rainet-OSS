@@ -91,6 +91,8 @@ public class RadiusServerService {
 
     /**
      * Find customer by username (document or UUID).
+     * 
+     * Uses indexed query on document field for efficient lookups.
      */
     private Optional<Customer> findCustomerByUsername(String username) {
         // Try to find by UUID first
@@ -98,11 +100,8 @@ public class RadiusServerService {
             UUID id = UUID.fromString(username);
             return customerRepository.findById(id);
         } catch (IllegalArgumentException e) {
-            // Not a UUID, find by document using proper query
-            // In production, ensure document field has a database index
-            return customerRepository.findAll().stream()
-                .filter(c -> username.equals(c.getDocument()))
-                .findFirst();
+            // Not a UUID, find by document using indexed query
+            return customerRepository.findByDocument(username);
         }
     }
 
