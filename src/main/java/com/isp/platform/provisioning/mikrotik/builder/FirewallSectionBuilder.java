@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * Builds firewall and NAT configuration section.
- * Includes DDoS protection, connection tracking, and masquerading.
+ * Includes flood protection (SYN flood, connection rate limiting, port scan detection),
+ * connection tracking, and NAT masquerading.
  */
 @Component
 public class FirewallSectionBuilder {
@@ -30,23 +31,37 @@ public class FirewallSectionBuilder {
         sb.append("/ip/firewall/filter\n");
         
         // Drop invalid connections
-        sb.append("add action=drop chain=forward protocol=tcp tcp-flags=!syn,ack in-interface=ether1 out-interface=ether2+ comment=\"Drop invalid forward\"\n");
-        sb.append("add action=drop chain=forward connection-state=invalid comment=\"Drop invalid connections\"\n");
+        sb.append("add action=drop chain=input connection-state=invalid comment=\"Drop invalid input\"\n");
+        sb.append("add action=drop chain=forward connection-state=invalid comment=\"Drop invalid forward\"\n");
+        
+        // Flood protection - SYN flood
+        sb.append("add action=drop chain=input protocol=tcp tcp-flags=syn connection-limit=30,32 comment=\"Drop SYN flood\"\n");
+        
+        // Flood protection - Connection rate limiting per IP
+        sb.append("add action=add-src-to-address-list chain=input connection-state=new src-address-list=connection_limit address-list-timeout=1m comment=\"Track new connections\"\n");
+        sb.append("add action=drop chain=input src-address-list=connection_limit connection-state=new connection-limit=20,32 comment=\"Drop connection flood\"\n");
+        
+        // Flood protection - Port scan detection
+        sb.append("add action=add-src-to-address-list chain=input protocol=tcp psd=21,3s,3,1 address-list=port_scanners address-list-timeout=1d comment=\"Detect port scan\"\n");
+        sb.append("add action=drop chain=input src-address-list=port_scanners comment=\"Drop port scanners\"\n");
+        
+        // Flood protection - ICMP rate limiting
+        sb.append("add action=accept chain=input protocol=icmp limit=5,5:packet comment=\"Accept limited ICMP\"\n");
+        sb.append("add action=drop chain=input protocol=icmp comment=\"Drop ICMP flood\"\n");
         
         // Accept established and related
-        sb.append("add action=accept chain=forward connection-state=established,related comment=\"Accept established/related\"\n");
+        sb.append("add action=accept chain=input connection-state=established,related comment=\"Accept established/related input\"\n");
+        sb.append("add action=accept chain=forward connection-state=established,related comment=\"Accept established/related forward\"\n");
         
         // Accept new connections from LAN
         sb.append("add action=accept chain=forward in-interface=ether2+ out-interface=ether1 comment=\"Accept from LAN\"\n");
         
-        // Drop other forward traffic
-        sb.append("add action=drop chain=forward comment=\"Drop other forward traffic\"\n");
-        
-        // INPUT chain
-        sb.append("add action=accept chain=input connection-state=established,related comment=\"Accept established/related input\"\n");
-        sb.append("add action=accept chain=input protocol=icmp comment=\"Accept ICMP\"\n");
+        // Accept from local interfaces (INPUT chain)
         sb.append("add action=accept chain=input in-interface=!ether1 comment=\"Accept from local\"\n");
+        
+        // Drop other traffic
         sb.append("add action=drop chain=input comment=\"Drop other input\"\n");
+        sb.append("add action=drop chain=forward comment=\"Drop other forward\"\n");
         
         // Add custom rules if any
         if (config.getCustomRules() != null && !config.getCustomRules().isEmpty()) {
