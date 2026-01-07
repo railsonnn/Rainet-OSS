@@ -1,9 +1,7 @@
 package com.isp.platform.provisioning.radius;
 
-import com.isp.platform.billing.domain.Customer;
-import com.isp.platform.billing.domain.Plan;
-import com.isp.platform.billing.repository.CustomerRepository;
-import com.isp.platform.billing.repository.PlanRepository;
+import com.isp.platform.customer.domain.Customer;
+import com.isp.platform.customer.domain.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * RADIUS server integration for PPPoE authentication.
@@ -23,7 +22,6 @@ import java.util.Optional;
 public class RadiusServerService {
 
     private final CustomerRepository customerRepository;
-    private final PlanRepository planRepository;
 
     @Value("${radius.mikrotik-rate-limit-attribute:Mikrotik-Rate-Limit}")
     private String rateLimitAttribute;
@@ -39,8 +37,8 @@ public class RadiusServerService {
         log.info("RADIUS authentication request for user: {}", request.getUsername());
 
         try {
-            // Find customer by username (email or account ID)
-            Optional<Customer> customerOpt = customerRepository.findByEmail(request.getUsername());
+            // Find customer by document (username is customer document)
+            Optional<Customer> customerOpt = findCustomerByUsername(request.getUsername());
 
             if (customerOpt.isEmpty()) {
                 log.warn("Customer not found: {}", request.getUsername());
@@ -52,45 +50,34 @@ public class RadiusServerService {
 
             Customer customer = customerOpt.get();
 
-            // Check if customer is active and paid
-            if (!customer.isActive() || customer.isBlocked()) {
-                log.warn("Customer {} is blocked or inactive", request.getUsername());
-                return createBlockedResponse(customer);
+            // Check if customer is blocked (due to overdue invoices)
+            if (customer.isBlocked()) {
+                log.warn("Customer {} is blocked due to delinquency", request.getUsername());
+                return createBlockedResponse();
             }
 
-            // Get customer's plan
-            if (customer.getPlan() == null) {
-                log.warn("Customer {} has no plan assigned", request.getUsername());
+            // Check if customer status is not ACTIVE
+            if (!"ACTIVE".equalsIgnoreCase(customer.getStatus())) {
+                log.warn("Customer {} has status: {}", request.getUsername(), customer.getStatus());
                 return RadiusAuthRequest.RadiusAuthResponse.builder()
                     .authenticated(false)
-                    .errorMessage("No plan assigned")
+                    .errorMessage("Customer account is not active")
                     .build();
             }
 
-            Plan plan = customer.getPlan();
-
-            // Verify password (in real scenario, use bcrypt)
-            if (!verifyPassword(request.getPassword(), customer.getPasswordHash())) {
-                log.warn("Invalid password for customer: {}", request.getUsername());
-                return RadiusAuthRequest.RadiusAuthResponse.builder()
-                    .authenticated(false)
-                    .errorMessage("Invalid password")
-                    .build();
-            }
-
-            // Build successful response with plan attributes
-            Map<String, String> attributes = buildMikrotikAttributes(plan);
+            // Build successful response with plan from customer
+            Map<String, String> attributes = buildMikrotikAttributes(customer.getPlan());
 
             RadiusAuthRequest.RadiusAuthResponse response = RadiusAuthRequest.RadiusAuthResponse.builder()
                 .authenticated(true)
-                .profileName(plan.getName())
-                .uploadMbps(plan.getUploadMbps())
-                .downloadMbps(plan.getDownloadMbps())
+                .profileName(customer.getPlan())
+                .uploadMbps(getUploadMbps(customer.getPlan()))
+                .downloadMbps(getDownloadMbps(customer.getPlan()))
                 .attributes(attributes)
                 .build();
 
             log.info("RADIUS authentication successful for customer: {} with plan: {}", 
-                request.getUsername(), plan.getName());
+                request.getUsername(), customer.getPlan());
 
             return response;
         } catch (Exception e) {
@@ -103,17 +90,37 @@ public class RadiusServerService {
     }
 
     /**
+     * Find customer by username (document or UUID).
+     */
+    private Optional<Customer> findCustomerByUsername(String username) {
+        // Try to find by UUID first
+        try {
+            UUID id = UUID.fromString(username);
+            return customerRepository.findById(id);
+        } catch (IllegalArgumentException e) {
+            // Not a UUID, try finding by document
+            // For now, we'll search all customers (in production, add proper indexing)
+            return customerRepository.findAll().stream()
+                .filter(c -> c.getDocument().equals(username))
+                .findFirst();
+        }
+    }
+
+    /**
      * Build MikroTik-specific RADIUS attributes for rate limiting.
      */
-    private Map<String, String> buildMikrotikAttributes(Plan plan) {
+    private Map<String, String> buildMikrotikAttributes(String planName) {
         Map<String, String> attributes = new HashMap<>();
         
+        int uploadMbps = getUploadMbps(planName);
+        int downloadMbps = getDownloadMbps(planName);
+        
         // MikroTik rate limit format: upload/download in bytes per second
-        long uploadBps = plan.getUploadMbps() * 1_000_000L / 8; // Convert Mbps to bytes/sec
-        long downloadBps = plan.getDownloadMbps() * 1_000_000L / 8;
+        long uploadBps = uploadMbps * 1_000_000L / 8; // Convert Mbps to bytes/sec
+        long downloadBps = downloadMbps * 1_000_000L / 8;
         
         attributes.put(rateLimitAttribute, String.format("%d/%d", uploadBps, downloadBps));
-        attributes.put("Mikrotik-Queue-Name", plan.getName());
+        attributes.put("Mikrotik-Queue-Name", planName);
         attributes.put("Reply-Message", "Welcome to Rainet ISP!");
         
         return attributes;
@@ -121,17 +128,18 @@ public class RadiusServerService {
 
     /**
      * Create a RADIUS response for blocked customers.
-     * Returns minimal bandwidth to prevent access.
+     * Returns minimal bandwidth (1 Kbps) to indicate blocked status.
      */
-    private RadiusAuthRequest.RadiusAuthResponse createBlockedResponse(Customer customer) {
+    private RadiusAuthRequest.RadiusAuthResponse createBlockedResponse() {
         Map<String, String> attributes = new HashMap<>();
         
-        // Minimal bandwidth for blocked customers (1 Kbps)
-        attributes.put(rateLimitAttribute, "1/1");
-        attributes.put("Reply-Message", "Your account is blocked. Please contact support.");
+        // Minimal bandwidth for blocked customers (125 bytes/sec = 1 Kbps)
+        attributes.put(rateLimitAttribute, "125/125");
+        attributes.put("Mikrotik-Queue-Name", "BLOCKED");
+        attributes.put("Reply-Message", "Your account is blocked due to overdue payment. Please contact support.");
         
         return RadiusAuthRequest.RadiusAuthResponse.builder()
-            .authenticated(true)
+            .authenticated(true)  // Authenticated but with restricted access
             .profileName("BLOCKED")
             .uploadMbps(0)
             .downloadMbps(0)
@@ -140,11 +148,32 @@ public class RadiusServerService {
     }
 
     /**
-     * Simple password verification (should use bcrypt in production).
+     * Get upload speed in Mbps based on plan name.
+     * In a real system, this would query a Plan entity.
      */
-    private boolean verifyPassword(String plainPassword, String hashedPassword) {
-        // TODO: Implement bcrypt verification
-        // return BCrypt.checkpw(plainPassword, hashedPassword);
-        return true; // Placeholder
+    private int getUploadMbps(String planName) {
+        // Simplified plan mapping
+        return switch (planName.toUpperCase()) {
+            case "BASIC" -> 5;
+            case "STANDARD" -> 10;
+            case "PREMIUM" -> 20;
+            case "ENTERPRISE" -> 50;
+            default -> 10; // Default 10 Mbps
+        };
+    }
+
+    /**
+     * Get download speed in Mbps based on plan name.
+     * In a real system, this would query a Plan entity.
+     */
+    private int getDownloadMbps(String planName) {
+        // Simplified plan mapping
+        return switch (planName.toUpperCase()) {
+            case "BASIC" -> 10;
+            case "STANDARD" -> 20;
+            case "PREMIUM" -> 50;
+            case "ENTERPRISE" -> 100;
+            default -> 20; // Default 20 Mbps
+        };
     }
 }

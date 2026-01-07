@@ -2,9 +2,9 @@ package com.isp.platform.billing.integration;
 
 import com.isp.platform.billing.domain.Invoice;
 import com.isp.platform.billing.domain.InvoiceStatus;
-import com.isp.platform.billing.repository.InvoiceRepository;
+import com.isp.platform.billing.domain.InvoiceRepository;
 import com.isp.platform.customer.domain.Customer;
-import com.isp.platform.customer.repository.CustomerRepository;
+import com.isp.platform.customer.domain.CustomerRepository;
 import com.isp.platform.provisioning.radius.RadiusServerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +18,10 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * PIX payment gateway integration supporting Asaas and Gerencianet.
@@ -125,7 +127,8 @@ public class PixGatewayService {
         log.info("Unlocking customer: {}", customerId);
 
         try {
-            Optional<Customer> customerOpt = customerRepository.findById(customerId);
+            UUID customerUuid = UUID.fromString(customerId);
+            Optional<Customer> customerOpt = customerRepository.findById(customerUuid);
 
             if (customerOpt.isEmpty()) {
                 log.warn("Customer not found: {}", customerId);
@@ -133,13 +136,25 @@ public class PixGatewayService {
             }
 
             Customer customer = customerOpt.get();
-            customer.setBlocked(false);
-            customerRepository.save(customer);
-
-            log.info("Customer {} unlocked successfully", customerId);
+            
+            // Only unblock if customer has no more overdue invoices
+            // Check if there are any other unpaid/overdue invoices
+            List<Invoice> overdueInvoices = invoiceRepository.findByCustomerIdAndStatus(customerId, InvoiceStatus.OVERDUE);
+            List<Invoice> pendingInvoices = invoiceRepository.findByCustomerIdAndStatus(customerId, InvoiceStatus.PENDING);
+            
+            if (overdueInvoices.isEmpty() && pendingInvoices.isEmpty()) {
+                customer.setBlocked(false);
+                customerRepository.save(customer);
+                log.info("Customer {} unlocked successfully - no more overdue invoices", customerId);
+            } else {
+                log.info("Customer {} still has {} overdue and {} pending invoices, remaining blocked", 
+                        customerId, overdueInvoices.size(), pendingInvoices.size());
+            }
 
             // Notify RADIUS to update profile
             // The next PPPoE authentication will now succeed with full bandwidth
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid customer ID format: {}", customerId, e);
         } catch (Exception e) {
             log.error("Failed to unlock customer: {}", customerId, e);
         }
