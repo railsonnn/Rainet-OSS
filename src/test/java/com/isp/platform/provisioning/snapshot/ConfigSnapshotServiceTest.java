@@ -139,12 +139,7 @@ class ConfigSnapshotServiceTest {
 
     @Test
     void testVerifySnapshot() {
-        // Arrange
-        ConfigSnapshot snapshot = new ConfigSnapshot();
-        snapshot.setConfigScript(testConfig);
-        snapshot.setConfigHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"); // Example hash
-
-        // Mock the export to return the test config
+        // Arrange - Mock the export to return the test config
         when(routerOsExecutor.exportCompact(testRouter)).thenReturn(testConfig);
         when(snapshotRepository.save(any(ConfigSnapshot.class))).thenAnswer(invocation -> {
             ConfigSnapshot s = invocation.getArgument(0);
@@ -152,7 +147,7 @@ class ConfigSnapshotServiceTest {
             return s;
         });
 
-        // Act
+        // Act - Create a snapshot which will have the correct hash
         ConfigSnapshot created = snapshotService.createBeforeSnapshot(testRouter, testUser);
         boolean isValid = snapshotService.verifySnapshot(created);
 
