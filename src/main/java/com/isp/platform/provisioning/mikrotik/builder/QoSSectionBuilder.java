@@ -43,12 +43,12 @@ public class QoSSectionBuilder {
         
         // Simple traffic marking for QoS
         sb.append("/ip/firewall/mangle\n");
-        sb.append(":foreach rule in=[find comment~\"Rainet: QoS\"] do={ /ip/firewall/mangle remove $rule }\n");
+        sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /ip/firewall/mangle remove $rule }\n");
         
         if (config.getWanInterface() != null && config.getBridgeInterface() != null) {
-            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=download comment=\"Rainet: QoS Mark download\"\n",
+            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=download comment=\"Rainet: Mark download\"\n",
                 config.getWanInterface(), config.getBridgeInterface()));
-            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=upload comment=\"Rainet: QoS Mark upload\"\n",
+            sb.append(String.format("add action=mark-connection chain=forward in-interface=%s out-interface=%s new-connection-mark=upload comment=\"Rainet: Mark upload\"\n",
                 config.getBridgeInterface(), config.getWanInterface()));
         }
         

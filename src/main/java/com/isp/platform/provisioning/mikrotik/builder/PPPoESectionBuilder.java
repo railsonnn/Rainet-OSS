@@ -73,6 +73,10 @@ public class PPPoESectionBuilder {
             sb.append(String.format(":if ([/radius print count-only where address=\"%s\" service=ppp] > 0) do={\n", config.getRadiusServer()));
             sb.append(String.format("  /radius remove [find address=\"%s\" service=ppp]\n", config.getRadiusServer()));
             sb.append("}\n");
+            // NOTE: RADIUS secret is included in script. For production, consider:
+            // 1. Encrypting the generated script
+            // 2. Using environment-specific secrets
+            // 3. Manual configuration after script application
             sb.append(String.format("add service=ppp address=%s secret=%s timeout=3s\n", 
                 config.getRadiusServer(), config.getRadiusSecret()));
         }

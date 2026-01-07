@@ -34,6 +34,7 @@ public class LanSectionBuilder {
             sb.append(":if ([/ip/pool print count-only where name=\"lan-pool\"] > 0) do={\n");
             sb.append("  /ip/pool remove [find name=\"lan-pool\"]\n");
             sb.append("}\n");
+            // Reserve IPs 1-9 for static assignments (router gateway, servers, printers, etc.)
             sb.append(String.format("add name=lan-pool ranges=%s-%s\n", 
                 incrementIp(lanIp, 10), incrementIp(lanIp, 254)));
             

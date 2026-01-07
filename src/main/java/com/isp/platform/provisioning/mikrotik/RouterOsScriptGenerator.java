@@ -66,8 +66,10 @@ public class RouterOsScriptGenerator {
                 .pppoeEnabled(true)
                 .pppoeService("rainet-isp")
                 .pppePlans(buildDefaultPPPoEPlans())
-                .radiusServer("127.0.0.1") // local RADIUS server
-                .radiusSecret("rainet-radius-secret")
+                // RADIUS server configuration - should come from application.yml or wizard
+                // TODO: Make RADIUS server and secret configurable via properties
+                .radiusServer("127.0.0.1") // localhost - change in production
+                .radiusSecret("CHANGE_ME_IN_PRODUCTION") // placeholder secret
                 // QoS configuration
                 .qosEnabled(true)
                 .defaultBandwidthMbps(1000)
