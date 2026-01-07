@@ -69,7 +69,7 @@ public class BillingController {
             return ResponseEntity.ok(ApiResponse.ok("Webhook processed successfully"));
         } catch (Exception e) {
             log.error("Error processing PIX webhook", e);
-            return ResponseEntity.ok(ApiResponse.ok("Webhook received"));
+            return ResponseEntity.status(500).body(ApiResponse.error("Webhook processing failed: " + e.getMessage()));
         }
     }
 }

@@ -112,7 +112,7 @@ public class PixBillingIntegrationTest {
             .eventType("PAYMENT_CONFIRMED")
             .paymentId("pay_" + UUID.randomUUID())
             .invoiceId(testInvoice.getId().toString())
-            .status("PAID")
+            .status("CONFIRMED")
             .amount(testInvoice.getAmount())
             .paidAt(LocalDateTime.now())
             .build();
