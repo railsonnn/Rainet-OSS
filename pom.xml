@@ -87,7 +87,8 @@
             <artifactId>mikrotik</artifactId>
             <version>${mikrotik.version}</version>
         </dependency>
-        <!-- RADIUS Client - Commented out due to availability issues -->
+        <!-- RADIUS Client -->
+        <!-- TODO: Find alternative RADIUS library or fix repository -->
         <!--
         <dependency>
             <groupId>net.jradius</groupId>

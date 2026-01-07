@@ -2,9 +2,9 @@ package com.isp.platform.billing.integration;
 
 import com.isp.platform.billing.domain.Invoice;
 import com.isp.platform.billing.domain.InvoiceStatus;
-import com.isp.platform.billing.repository.InvoiceRepository;
+import com.isp.platform.billing.domain.InvoiceRepository;
 import com.isp.platform.customer.domain.Customer;
-import com.isp.platform.customer.repository.CustomerRepository;
+import com.isp.platform.customer.domain.CustomerRepository;
 import com.isp.platform.provisioning.radius.RadiusServerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

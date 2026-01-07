@@ -1,9 +1,9 @@
 package com.isp.platform.provisioning.radius;
 
-import com.isp.platform.billing.domain.Customer;
+import com.isp.platform.customer.domain.Customer;
 import com.isp.platform.billing.domain.Plan;
-import com.isp.platform.billing.repository.CustomerRepository;
-import com.isp.platform.billing.repository.PlanRepository;
+import com.isp.platform.customer.domain.CustomerRepository;
+import com.isp.platform.billing.domain.PlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
