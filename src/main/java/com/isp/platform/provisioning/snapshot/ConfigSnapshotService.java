@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service for managing router configuration snapshots.
@@ -105,7 +106,7 @@ public class ConfigSnapshotService {
      * @param appliedBy user performing the rollback
      * @return the AFTER snapshot of the rollback
      */
-    public ConfigSnapshot performRollback(Long snapshotId, String appliedBy) {
+    public ConfigSnapshot performRollback(UUID snapshotId, String appliedBy) {
         log.info("Performing rollback to snapshot ID: {}", snapshotId);
         
         ConfigSnapshot beforeSnapshot = snapshotRepository.findById(snapshotId)
@@ -126,7 +127,7 @@ public class ConfigSnapshotService {
             afterSnapshot.setRouter(router);
             afterSnapshot.setTenantId(router.getTenantId());
             afterSnapshot.setSnapshotType(ConfigSnapshot.SnapshotType.AFTER);
-            afterSnapshot.setDescription(String.format("Rollback to snapshot %d", snapshotId));
+            afterSnapshot.setDescription(String.format("Rollback to snapshot %s", snapshotId));
             afterSnapshot.setConfigScript(beforeSnapshot.getConfigScript());
             afterSnapshot.setConfigHash(beforeSnapshot.getConfigHash());
             afterSnapshot.setAppliedBy(appliedBy);
@@ -167,9 +168,15 @@ public class ConfigSnapshotService {
      * Verify snapshot integrity by comparing calculated hash.
      *
      * @param snapshot the snapshot to verify
-     * @return true if hash matches
+     * @return true if hash matches or if it's a legacy snapshot without hash
      */
     public boolean verifySnapshot(ConfigSnapshot snapshot) {
+        // Legacy snapshots created before hash implementation are considered valid
+        if ("LEGACY_SNAPSHOT_NO_HASH".equals(snapshot.getConfigHash())) {
+            log.warn("Skipping verification for legacy snapshot ID: {}", snapshot.getId());
+            return true;
+        }
+        
         String calculatedHash = calculateSha256(snapshot.getConfigScript());
         return calculatedHash.equals(snapshot.getConfigHash());
     }
