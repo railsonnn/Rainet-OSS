@@ -100,6 +100,11 @@ public class ConfigSnapshotService {
 
     /**
      * Perform a rollback to a previous BEFORE snapshot.
+     * 
+     * Note: This method provides direct rollback functionality that can be used
+     * independently of ProvisioningService for advanced use cases or scripting.
+     * For standard rollback operations through the API, use ProvisioningService.rollback()
+     * which includes additional validation and audit logging.
      *
      * @param snapshotId the snapshot ID to rollback to
      * @param appliedBy user performing the rollback
