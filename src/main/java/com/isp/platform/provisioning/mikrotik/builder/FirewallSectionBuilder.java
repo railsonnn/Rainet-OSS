@@ -12,6 +12,10 @@ import java.util.List;
 @Component
 public class FirewallSectionBuilder {
 
+    // Address list names
+    private static final String ADDRESS_LIST_CONNECTION_LIMIT = "connection_limit";
+    private static final String ADDRESS_LIST_PORT_SCANNERS = "port_scanners";
+
     public String build(RouterOsConfig config) {
         StringBuilder sb = new StringBuilder();
         
@@ -38,12 +42,12 @@ public class FirewallSectionBuilder {
         sb.append("add action=drop chain=input protocol=tcp tcp-flags=syn connection-limit=30,32 comment=\"Drop SYN flood\"\n");
         
         // Flood protection - Connection rate limiting per IP
-        sb.append("add action=add-src-to-address-list chain=input connection-state=new src-address-list=connection_limit address-list-timeout=1m comment=\"Track new connections\"\n");
-        sb.append("add action=drop chain=input src-address-list=connection_limit connection-state=new connection-limit=20,32 comment=\"Drop connection flood\"\n");
+        sb.append("add action=add-src-to-address-list chain=input connection-state=new src-address-list=").append(ADDRESS_LIST_CONNECTION_LIMIT).append(" address-list-timeout=1m comment=\"Track new connections\"\n");
+        sb.append("add action=drop chain=input src-address-list=").append(ADDRESS_LIST_CONNECTION_LIMIT).append(" connection-state=new connection-limit=20,32 comment=\"Drop connection flood\"\n");
         
         // Flood protection - Port scan detection
-        sb.append("add action=add-src-to-address-list chain=input protocol=tcp psd=21,3s,3,1 address-list=port_scanners address-list-timeout=1d comment=\"Detect port scan\"\n");
-        sb.append("add action=drop chain=input src-address-list=port_scanners comment=\"Drop port scanners\"\n");
+        sb.append("add action=add-src-to-address-list chain=input protocol=tcp psd=21,3s,3,1 address-list=").append(ADDRESS_LIST_PORT_SCANNERS).append(" address-list-timeout=1d comment=\"Detect port scan\"\n");
+        sb.append("add action=drop chain=input src-address-list=").append(ADDRESS_LIST_PORT_SCANNERS).append(" comment=\"Drop port scanners\"\n");
         
         // Flood protection - ICMP rate limiting
         sb.append("add action=accept chain=input protocol=icmp limit=5,5:packet comment=\"Accept limited ICMP\"\n");
