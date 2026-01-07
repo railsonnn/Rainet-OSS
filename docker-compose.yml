@@ -10,15 +10,39 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+  
+  freeradius:
+    image: freeradius/freeradius-server:latest
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: rainet
+      DB_USER: rainet
+      DB_PASSWORD: rainet
+      RADIUS_SECRET: testing123
+    ports:
+      - "1812:1812/udp"  # Authentication
+      - "1813:1813/udp"  # Accounting
+    volumes:
+      - ./freeradius/radiusd.conf:/etc/raddb/radiusd.conf:ro
+      - ./freeradius/clients.conf:/etc/raddb/clients.conf:ro
+      - ./freeradius/sql.conf:/etc/raddb/mods-available/sql:ro
+    command: ["-X"]  # Debug mode
+  
   app:
     build: .
     depends_on:
       - db
+      - freeradius
     environment:
       DB_URL: jdbc:postgresql://db:5432/rainet
       DB_USER: rainet
       DB_PASS: rainet
       JWT_SECRET: change-me-secret-change-me-secret-change-me
+      RADIUS_SERVER: freeradius
+      RADIUS_SECRET: testing123
     ports:
       - "8080:8080"
     command: ["java","-jar","/app/app.jar"]
