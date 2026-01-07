@@ -21,6 +21,8 @@ public class BillingService {
 
     @Transactional
     public Invoice generate(GenerateInvoiceRequest request) {
+        // Tenant ID is automatically set by TenantEntityListener on persist
+        requireTenant(); // Verify tenant context is set
         Invoice invoice = new Invoice();
         invoice.setCustomerId(request.customerId());
         invoice.setAmount(request.amount());
@@ -31,12 +33,14 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public List<Invoice> list() {
-        return invoiceRepository.findByTenantId(requireTenant());
+        UUID tenantId = requireTenant();
+        return invoiceRepository.findByTenantId(tenantId);
     }
 
     @Transactional
     public Invoice pay(UUID invoiceId, PayRequest request) {
-        Invoice invoice = invoiceRepository.findByIdAndTenantId(invoiceId, requireTenant())
+        UUID tenantId = requireTenant();
+        Invoice invoice = invoiceRepository.findByIdAndTenantId(invoiceId, tenantId)
                 .orElseThrow(() -> new ApiException("Invoice not found"));
         invoice.setStatus(InvoiceStatus.PAID);
         return invoice;
