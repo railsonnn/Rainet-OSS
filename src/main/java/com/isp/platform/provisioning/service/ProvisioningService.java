@@ -1,5 +1,7 @@
 package com.isp.platform.provisioning.service;
 
+import com.isp.platform.audit.domain.AuditLog;
+import com.isp.platform.audit.service.AuditLogService;
 import com.isp.platform.common.exception.ApiException;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.provisioning.domain.Router;
@@ -20,16 +22,19 @@ public class ProvisioningService {
     private final RouterOsScriptGenerator scriptGenerator;
     private final RouterOsExecutor executor;
     private final ConfigSnapshotRepository snapshotRepository;
+    private final AuditLogService auditLogService;
 
     public ProvisioningService(
             RouterRepository routerRepository,
             RouterOsScriptGenerator scriptGenerator,
             RouterOsExecutor executor,
-            ConfigSnapshotRepository snapshotRepository) {
+            ConfigSnapshotRepository snapshotRepository,
+            AuditLogService auditLogService) {
         this.routerRepository = routerRepository;
         this.scriptGenerator = scriptGenerator;
         this.executor = executor;
         this.snapshotRepository = snapshotRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional(readOnly = true)
@@ -42,15 +47,38 @@ public class ProvisioningService {
     public UUID apply(ProvisioningRequest request, String actor) {
         Router router = findRouterForTenant(request.routerId());
         String script = scriptGenerator.generateProvisioningScript(router);
-        executor.apply(script);
+        
+        try {
+            executor.apply(script);
 
-        ConfigSnapshot snapshot = new ConfigSnapshot();
-        snapshot.setRouter(router);
-        snapshot.setConfigScript(script);
-        snapshot.setDescription(request.description());
-        snapshot.setAppliedBy(actor);
-        snapshotRepository.save(snapshot);
-        return snapshot.getId();
+            ConfigSnapshot snapshot = new ConfigSnapshot();
+            snapshot.setRouter(router);
+            snapshot.setConfigScript(script);
+            snapshot.setDescription(request.description());
+            snapshot.setAppliedBy(actor);
+            snapshotRepository.save(snapshot);
+            
+            // Log successful provisioning
+            auditLogService.logProvisioning(
+                actor,
+                AuditLog.AuditAction.PROVISIONING_APPLY,
+                router.getId().toString(),
+                request.description(),
+                AuditLog.AuditStatus.SUCCESS
+            );
+            
+            return snapshot.getId();
+        } catch (Exception e) {
+            // Log failed provisioning
+            auditLogService.logProvisioning(
+                actor,
+                AuditLog.AuditAction.PROVISIONING_APPLY,
+                router.getId().toString(),
+                request.description(),
+                AuditLog.AuditStatus.FAILURE
+            );
+            throw e;
+        }
     }
 
     @Transactional
@@ -59,14 +87,34 @@ public class ProvisioningService {
         ConfigSnapshot snapshot = snapshotRepository.findById(snapshotId)
                 .filter(s -> tenantId.equals(s.getTenantId()))
                 .orElseThrow(() -> new ApiException("Snapshot not found"));
-        executor.apply(snapshot.getConfigScript());
+        
+        try {
+            executor.apply(snapshot.getConfigScript());
 
-        ConfigSnapshot rollbackLog = new ConfigSnapshot();
-        rollbackLog.setRouter(snapshot.getRouter());
-        rollbackLog.setConfigScript(snapshot.getConfigScript());
-        rollbackLog.setDescription("Rollback by " + actor);
-        rollbackLog.setAppliedBy(actor);
-        snapshotRepository.save(rollbackLog);
+            ConfigSnapshot rollbackLog = new ConfigSnapshot();
+            rollbackLog.setRouter(snapshot.getRouter());
+            rollbackLog.setConfigScript(snapshot.getConfigScript());
+            rollbackLog.setDescription("Rollback by " + actor);
+            rollbackLog.setAppliedBy(actor);
+            snapshotRepository.save(rollbackLog);
+            
+            // Log successful rollback
+            auditLogService.logRollback(
+                actor,
+                snapshot.getRouter().getId().toString(),
+                snapshotId.toString(),
+                AuditLog.AuditStatus.SUCCESS
+            );
+        } catch (Exception e) {
+            // Log failed rollback
+            auditLogService.logRollback(
+                actor,
+                snapshot.getRouter().getId().toString(),
+                snapshotId.toString(),
+                AuditLog.AuditStatus.FAILURE
+            );
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)

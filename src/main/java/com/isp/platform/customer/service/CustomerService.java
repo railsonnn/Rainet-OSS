@@ -1,5 +1,7 @@
 package com.isp.platform.customer.service;
 
+import com.isp.platform.audit.domain.AuditLog;
+import com.isp.platform.audit.service.AuditLogService;
 import com.isp.platform.common.exception.ApiException;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.customer.domain.Customer;
@@ -12,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CustomerService {
 
     private final CustomerRepository repository;
+    private final AuditLogService auditLogService;
 
-    public CustomerService(CustomerRepository repository) {
+    public CustomerService(CustomerRepository repository, AuditLogService auditLogService) {
         this.repository = repository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -24,7 +28,18 @@ public class CustomerService {
         customer.setDocument(request.document());
         customer.setPlan(request.plan());
         customer.setStatus("ACTIVE");
-        return repository.save(customer);
+        Customer savedCustomer = repository.save(customer);
+        
+        // Log customer creation
+        auditLogService.logCustomer(
+            "SYSTEM",
+            AuditLog.AuditAction.CUSTOMER_CREATE,
+            savedCustomer.getId().toString(),
+            request,
+            AuditLog.AuditStatus.SUCCESS
+        );
+        
+        return savedCustomer;
     }
 
     @Transactional(readOnly = true)

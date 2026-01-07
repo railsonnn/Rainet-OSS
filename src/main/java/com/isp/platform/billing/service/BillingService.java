@@ -1,5 +1,7 @@
 package com.isp.platform.billing.service;
 
+import com.isp.platform.audit.domain.AuditLog;
+import com.isp.platform.audit.service.AuditLogService;
 import com.isp.platform.billing.domain.Invoice;
 import com.isp.platform.billing.domain.InvoiceRepository;
 import com.isp.platform.billing.domain.InvoiceStatus;
@@ -14,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class BillingService {
 
     private final InvoiceRepository invoiceRepository;
+    private final AuditLogService auditLogService;
 
-    public BillingService(InvoiceRepository invoiceRepository) {
+    public BillingService(InvoiceRepository invoiceRepository, AuditLogService auditLogService) {
         this.invoiceRepository = invoiceRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -26,7 +30,18 @@ public class BillingService {
         invoice.setAmount(request.amount());
         invoice.setDueDate(request.dueDate());
         invoice.setStatus(InvoiceStatus.PENDING);
-        return invoiceRepository.save(invoice);
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+        
+        // Log invoice generation
+        auditLogService.logBilling(
+            "SYSTEM",
+            AuditLog.AuditAction.BILLING_INVOICE_CREATE,
+            savedInvoice.getId().toString(),
+            request,
+            AuditLog.AuditStatus.SUCCESS
+        );
+        
+        return savedInvoice;
     }
 
     @Transactional(readOnly = true)
@@ -39,6 +54,16 @@ public class BillingService {
         Invoice invoice = invoiceRepository.findByIdAndTenantId(invoiceId, requireTenant())
                 .orElseThrow(() -> new ApiException("Invoice not found"));
         invoice.setStatus(InvoiceStatus.PAID);
+        
+        // Log invoice payment
+        auditLogService.logBilling(
+            request.paidBy() != null ? request.paidBy() : "SYSTEM",
+            AuditLog.AuditAction.BILLING_INVOICE_PAID,
+            invoiceId.toString(),
+            request,
+            AuditLog.AuditStatus.SUCCESS
+        );
+        
         return invoice;
     }
 
