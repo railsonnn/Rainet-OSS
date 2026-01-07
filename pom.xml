@@ -87,12 +87,6 @@
             <artifactId>mikrotik</artifactId>
             <version>${mikrotik.version}</version>
         </dependency>
-        <!-- RADIUS Client -->
-        <dependency>
-            <groupId>net.jradius</groupId>
-            <artifactId>jradius-core</artifactId>
-            <version>1.2.7</version>
-        </dependency>
         <!-- HTTP Client for PIX/Billing Integration -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

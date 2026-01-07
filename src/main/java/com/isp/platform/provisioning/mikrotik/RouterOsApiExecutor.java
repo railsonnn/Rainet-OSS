@@ -3,10 +3,8 @@ package com.isp.platform.provisioning.mikrotik;
 import com.isp.platform.provisioning.domain.Router;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import me.legrange.mikrotik.MikrotikApiConnection;
-import me.legrange.mikrotik.MikrotikApiConnectionFactory;
-import me.legrange.mikrotik.MikrotikApiException;
 import me.legrange.mikrotik.ApiConnection;
+import me.legrange.mikrotik.MikrotikApiException;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedWriter;
@@ -41,8 +39,8 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         try {
             log.info("Testing connection to router: {} ({})", router.getHostname(), router.getManagementAddress());
             
-            MikrotikApiConnection conn = createConnection(router);
-            conn.connect();
+            ApiConnection conn = createConnection(router);
+            // Connection is already established in createConnection
             conn.close();
             
             log.info("Connection test successful for router: {}", router.getHostname());
@@ -55,12 +53,12 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
 
     @Override
     public void applyScript(Router router, String script) {
-        MikrotikApiConnection conn = null;
+        ApiConnection conn = null;
         try {
             log.info("Applying script to router: {}", router.getHostname());
             
             conn = createConnection(router);
-            conn.connect();
+            // Connection is already established in createConnection
             
             // Create temporary script file on router
             String scriptName = generateScriptName();
@@ -89,12 +87,12 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
 
     @Override
     public String exportCompact(Router router) {
-        MikrotikApiConnection conn = null;
+        ApiConnection conn = null;
         try {
             log.info("Exporting compact configuration from router: {}", router.getHostname());
             
             conn = createConnection(router);
-            conn.connect();
+            
             
             // Execute /export compact command
             String command = "/export compact";
@@ -119,16 +117,13 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     /**
      * Create a MikroTik API connection.
      */
-    private MikrotikApiConnection createConnection(Router router) throws MikrotikApiException {
+    private ApiConnection createConnection(Router router) throws MikrotikApiException {
         log.debug("Creating connection to {} at {}", router.getHostname(), router.getManagementAddress());
         
-        MikrotikApiConnection conn = MikrotikApiConnectionFactory.buildConnection()
-                .setRemoteAddress(router.getManagementAddress())
-                .setPort(API_PORT)
-                .setUsername(router.getApiUsername())
-                .setPassword(router.getApiPassword())
-                .setSocketTimeout(TIMEOUT_SECONDS * 1000)
-                .build();
+        // Connect to MikroTik using API
+        ApiConnection conn = ApiConnection.connect(router.getManagementAddress());
+        conn.login(router.getApiUsername(), router.getApiPassword());
+        conn.setTimeout(TIMEOUT_SECONDS * 1000);
         
         return conn;
     }
@@ -136,7 +131,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     /**
      * Upload script to router via API.
      */
-    private void uploadScript(MikrotikApiConnection conn, String scriptName, String scriptContent) 
+    private void uploadScript(ApiConnection conn, String scriptName, String scriptContent) 
             throws MikrotikApiException, IOException {
         
         log.debug("Uploading script '{}' to router", scriptName);
@@ -153,7 +148,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     /**
      * Execute a script on the router.
      */
-    private void executeScript(MikrotikApiConnection conn, String scriptName) 
+    private void executeScript(ApiConnection conn, String scriptName) 
             throws MikrotikApiException {
         
         log.debug("Executing script '{}' on router", scriptName);
@@ -165,7 +160,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     /**
      * Remove script from router.
      */
-    private void removeScript(MikrotikApiConnection conn, String scriptName) 
+    private void removeScript(ApiConnection conn, String scriptName) 
             throws MikrotikApiException {
         
         log.debug("Removing script '{}' from router", scriptName);
@@ -182,7 +177,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
     /**
      * Execute a raw command on the router.
      */
-    private String executeCommand(MikrotikApiConnection conn, String command) 
+    private String executeCommand(ApiConnection conn, String command) 
             throws MikrotikApiException {
         
         log.trace("Executing command: {}", command);
@@ -193,10 +188,12 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         String path = parts[0];
         
         // Execute and get result
-        String result = conn.execute(path);
+        java.util.List<java.util.Map<String, String>> result = conn.execute(path);
         
-        log.trace("Command result: {}", result);
-        return result;
+        // Convert result to string for logging/returning
+        String resultStr = result.toString();
+        log.trace("Command result: {}", resultStr);
+        return resultStr;
     }
 
     /**

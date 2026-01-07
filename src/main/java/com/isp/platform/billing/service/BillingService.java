@@ -1,7 +1,7 @@
 package com.isp.platform.billing.service;
 
 import com.isp.platform.billing.domain.Invoice;
-import com.isp.platform.billing.domain.InvoiceRepository;
+import com.isp.platform.billing.repository.InvoiceRepository;
 import com.isp.platform.billing.domain.InvoiceStatus;
 import com.isp.platform.common.exception.ApiException;
 import com.isp.platform.gateway.tenant.TenantContext;

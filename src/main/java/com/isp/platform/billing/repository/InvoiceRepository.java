@@ -1,5 +1,6 @@
-package com.isp.platform.billing.domain;
+package com.isp.platform.billing.repository;
 
+import com.isp.platform.billing.domain.Invoice;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
