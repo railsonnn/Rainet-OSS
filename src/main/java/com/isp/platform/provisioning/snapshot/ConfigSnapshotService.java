@@ -35,7 +35,7 @@ public class ConfigSnapshotService {
         
         try {
             String configScript = routerOsExecutor.exportCompact(router);
-            String configHash = calculateSha256(configScript);
+            String configHash = HashUtil.sha256(configScript);
             
             ConfigSnapshot snapshot = new ConfigSnapshot();
             snapshot.setRouter(router);
@@ -67,7 +67,7 @@ public class ConfigSnapshotService {
         
         try {
             String configScript = routerOsExecutor.exportCompact(router);
-            String configHash = calculateSha256(configScript);
+            String configHash = HashUtil.sha256(configScript);
             
             ConfigSnapshot snapshot = new ConfigSnapshot();
             snapshot.setRouter(router);
@@ -100,12 +100,17 @@ public class ConfigSnapshotService {
 
     /**
      * Perform a rollback to a previous BEFORE snapshot.
+     * 
+     * Note: This method provides direct rollback functionality that can be used
+     * independently of ProvisioningService for advanced use cases or scripting.
+     * For standard rollback operations through the API, use ProvisioningService.rollback()
+     * which includes additional validation and audit logging.
      *
      * @param snapshotId the snapshot ID to rollback to
      * @param appliedBy user performing the rollback
      * @return the AFTER snapshot of the rollback
      */
-    public ConfigSnapshot performRollback(Long snapshotId, String appliedBy) {
+    public ConfigSnapshot performRollback(UUID snapshotId, String appliedBy) {
         log.info("Performing rollback to snapshot ID: {}", snapshotId);
         
         ConfigSnapshot beforeSnapshot = snapshotRepository.findById(snapshotId)
@@ -126,7 +131,7 @@ public class ConfigSnapshotService {
             afterSnapshot.setRouter(router);
             afterSnapshot.setTenantId(router.getTenantId());
             afterSnapshot.setSnapshotType(ConfigSnapshot.SnapshotType.AFTER);
-            afterSnapshot.setDescription(String.format("Rollback to snapshot %d", snapshotId));
+            afterSnapshot.setDescription(String.format("Rollback to snapshot %s", snapshotId));
             afterSnapshot.setConfigScript(beforeSnapshot.getConfigScript());
             afterSnapshot.setConfigHash(beforeSnapshot.getConfigHash());
             afterSnapshot.setAppliedBy(appliedBy);
@@ -141,36 +146,13 @@ public class ConfigSnapshotService {
     }
 
     /**
-     * Calculate SHA-256 hash of configuration script.
-     *
-     * @param content the configuration content
-     * @return SHA-256 hash as hex string
-     */
-    private String calculateSha256(String content) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
-        }
-    }
-
-    /**
      * Verify snapshot integrity by comparing calculated hash.
      *
      * @param snapshot the snapshot to verify
      * @return true if hash matches
      */
     public boolean verifySnapshot(ConfigSnapshot snapshot) {
-        String calculatedHash = calculateSha256(snapshot.getConfigScript());
+        String calculatedHash = HashUtil.sha256(snapshot.getConfigScript());
         return calculatedHash.equals(snapshot.getConfigHash());
     }
 }
