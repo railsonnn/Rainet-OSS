@@ -23,6 +23,12 @@ security:
     access-ttl-minutes: 15
     refresh-ttl-minutes: 43200
 
+radius:
+  server: localhost
+  port: 1812
+  secret: testing123
+  mikrotik-rate-limit-attribute: Mikrotik-Rate-Limit
+
 logging:
   level:
     root: INFO
@@ -40,6 +46,12 @@ spring:
 security:
   jwt:
     secret: ${JWT_SECRET}
+
+radius:
+  server: ${RADIUS_SERVER:localhost}
+  port: 1812
+  secret: ${RADIUS_SECRET:testing123}
+  mikrotik-rate-limit-attribute: Mikrotik-Rate-Limit
 
 logging:
   level:
