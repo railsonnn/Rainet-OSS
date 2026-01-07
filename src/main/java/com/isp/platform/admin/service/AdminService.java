@@ -24,6 +24,8 @@ public class AdminService {
 
     @Transactional
     public Pop createPop(PopRequest request) {
+        // Tenant ID is automatically set by TenantEntityListener on persist
+        requireTenant(); // Verify tenant context is set
         Pop pop = new Pop();
         pop.setName(request.name());
         pop.setCity(request.city());

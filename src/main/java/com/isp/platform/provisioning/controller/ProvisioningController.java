@@ -8,6 +8,7 @@ import java.security.Principal;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,12 +26,14 @@ public class ProvisioningController {
         this.provisioningService = provisioningService;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @PostMapping("/preview")
     public ResponseEntity<ApiResponse<Map<String, String>>> preview(@Valid @RequestBody ProvisioningRequest request) {
         String script = provisioningService.preview(request);
         return ResponseEntity.ok(ApiResponse.ok(Map.of("script", script)));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @PostMapping("/apply")
     public ResponseEntity<ApiResponse<Map<String, UUID>>> apply(
             @Valid @RequestBody ProvisioningRequest request,
@@ -39,6 +42,7 @@ public class ProvisioningController {
         return ResponseEntity.ok(ApiResponse.ok(Map.of("snapshotId", snapshotId)));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @PostMapping("/rollback/{snapshotId}")
     public ResponseEntity<ApiResponse<String>> rollback(
             @PathVariable UUID snapshotId,
@@ -47,6 +51,7 @@ public class ProvisioningController {
         return ResponseEntity.ok(ApiResponse.ok("rolled back"));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @GetMapping("/snapshots")
     public ResponseEntity<ApiResponse<?>> snapshots() {
         return ResponseEntity.ok(ApiResponse.ok(provisioningService.listSnapshots()));
