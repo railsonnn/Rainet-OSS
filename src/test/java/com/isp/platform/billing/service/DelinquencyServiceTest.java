@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -179,7 +180,7 @@ class DelinquencyServiceTest {
         boolean hasOverdue = delinquencyService.hasOverdueInvoices(customerIdStr);
 
         // Then
-        assert hasOverdue;
+        assertTrue(hasOverdue);
     }
 
     @Test
@@ -194,7 +195,7 @@ class DelinquencyServiceTest {
         boolean hasOverdue = delinquencyService.hasOverdueInvoices(customerIdStr);
 
         // Then
-        assert !hasOverdue;
+        assertFalse(hasOverdue);
     }
 
     @Test

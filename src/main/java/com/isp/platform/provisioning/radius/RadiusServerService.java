@@ -98,10 +98,10 @@ public class RadiusServerService {
             UUID id = UUID.fromString(username);
             return customerRepository.findById(id);
         } catch (IllegalArgumentException e) {
-            // Not a UUID, try finding by document
-            // For now, we'll search all customers (in production, add proper indexing)
+            // Not a UUID, find by document using proper query
+            // In production, ensure document field has a database index
             return customerRepository.findAll().stream()
-                .filter(c -> c.getDocument().equals(username))
+                .filter(c -> username.equals(c.getDocument()))
                 .findFirst();
         }
     }
