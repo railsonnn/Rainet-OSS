@@ -105,7 +105,7 @@ public class ConfigSnapshotService {
      * @param appliedBy user performing the rollback
      * @return the AFTER snapshot of the rollback
      */
-    public ConfigSnapshot performRollback(Long snapshotId, String appliedBy) {
+    public ConfigSnapshot performRollback(UUID snapshotId, String appliedBy) {
         log.info("Performing rollback to snapshot ID: {}", snapshotId);
         
         ConfigSnapshot beforeSnapshot = snapshotRepository.findById(snapshotId)
@@ -126,7 +126,7 @@ public class ConfigSnapshotService {
             afterSnapshot.setRouter(router);
             afterSnapshot.setTenantId(router.getTenantId());
             afterSnapshot.setSnapshotType(ConfigSnapshot.SnapshotType.AFTER);
-            afterSnapshot.setDescription(String.format("Rollback to snapshot %d", snapshotId));
+            afterSnapshot.setDescription(String.format("Rollback to snapshot %s", snapshotId));
             afterSnapshot.setConfigScript(beforeSnapshot.getConfigScript());
             afterSnapshot.setConfigHash(beforeSnapshot.getConfigHash());
             afterSnapshot.setAppliedBy(appliedBy);
