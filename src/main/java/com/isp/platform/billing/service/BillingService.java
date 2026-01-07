@@ -3,6 +3,8 @@ package com.isp.platform.billing.service;
 import com.isp.platform.billing.domain.Invoice;
 import com.isp.platform.billing.domain.InvoiceRepository;
 import com.isp.platform.billing.domain.InvoiceStatus;
+import com.isp.platform.billing.integration.PixGatewayService;
+import com.isp.platform.billing.integration.PixPaymentRequest;
 import com.isp.platform.common.exception.ApiException;
 import com.isp.platform.gateway.tenant.TenantContext;
 import java.util.List;
@@ -14,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class BillingService {
 
     private final InvoiceRepository invoiceRepository;
+    private final PixGatewayService pixGatewayService;
 
-    public BillingService(InvoiceRepository invoiceRepository) {
+    public BillingService(InvoiceRepository invoiceRepository, PixGatewayService pixGatewayService) {
         this.invoiceRepository = invoiceRepository;
+        this.pixGatewayService = pixGatewayService;
     }
 
     @Transactional
@@ -40,6 +44,13 @@ public class BillingService {
                 .orElseThrow(() -> new ApiException("Invoice not found"));
         invoice.setStatus(InvoiceStatus.PAID);
         return invoice;
+    }
+
+    @Transactional(readOnly = true)
+    public PixPaymentRequest.PixPaymentResponse generatePixQrCode(UUID invoiceId) {
+        Invoice invoice = invoiceRepository.findByIdAndTenantId(invoiceId, requireTenant())
+                .orElseThrow(() -> new ApiException("Invoice not found"));
+        return pixGatewayService.generatePixQrCode(invoice);
     }
 
     private UUID requireTenant() {

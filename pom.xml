@@ -87,12 +87,12 @@
             <artifactId>mikrotik</artifactId>
             <version>${mikrotik.version}</version>
         </dependency>
-        <!-- RADIUS Client -->
-        <dependency>
+        <!-- RADIUS Client - Commented out: artifact not available in Maven Central -->
+        <!-- <dependency>
             <groupId>net.jradius</groupId>
             <artifactId>jradius-core</artifactId>
             <version>1.2.7</version>
-        </dependency>
+        </dependency> -->
         <!-- HTTP Client for PIX/Billing Integration -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -2,10 +2,9 @@ package com.isp.platform.billing.integration;
 
 import com.isp.platform.billing.domain.Invoice;
 import com.isp.platform.billing.domain.InvoiceStatus;
-import com.isp.platform.billing.repository.InvoiceRepository;
+import com.isp.platform.billing.domain.InvoiceRepository;
 import com.isp.platform.customer.domain.Customer;
-import com.isp.platform.customer.repository.CustomerRepository;
-import com.isp.platform.provisioning.radius.RadiusServerService;
+import com.isp.platform.customer.domain.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * PIX payment gateway integration supporting Asaas and Gerencianet.
@@ -32,7 +32,6 @@ public class PixGatewayService {
 
     private final InvoiceRepository invoiceRepository;
     private final CustomerRepository customerRepository;
-    private final RadiusServerService radiusService;
     private final RestTemplate restTemplate;
 
     @Value("${pix.gateway:asaas}")
@@ -87,7 +86,7 @@ public class PixGatewayService {
 
         try {
             // Find invoice by payment ID or invoice ID
-            Optional<Invoice> invoiceOpt = invoiceRepository.findById(Long.parseLong(webhook.getInvoiceId()));
+            Optional<Invoice> invoiceOpt = invoiceRepository.findById(UUID.fromString(webhook.getInvoiceId()));
 
             if (invoiceOpt.isEmpty()) {
                 log.warn("Invoice not found for webhook: {}", webhook.getInvoiceId());
@@ -125,7 +124,7 @@ public class PixGatewayService {
         log.info("Unlocking customer: {}", customerId);
 
         try {
-            Optional<Customer> customerOpt = customerRepository.findById(customerId);
+            Optional<Customer> customerOpt = customerRepository.findById(UUID.fromString(customerId));
 
             if (customerOpt.isEmpty()) {
                 log.warn("Customer not found: {}", customerId);
