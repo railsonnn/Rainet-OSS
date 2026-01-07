@@ -1,6 +1,6 @@
 package com.isp.platform.gateway.security;
 
-enum TokenType {
+public enum TokenType {
     ACCESS,
     REFRESH
 }

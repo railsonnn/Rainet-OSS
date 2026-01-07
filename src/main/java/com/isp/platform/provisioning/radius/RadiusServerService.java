@@ -1,9 +1,7 @@
 package com.isp.platform.provisioning.radius;
 
-import com.isp.platform.billing.domain.Customer;
-import com.isp.platform.billing.domain.Plan;
-import com.isp.platform.billing.repository.CustomerRepository;
-import com.isp.platform.billing.repository.PlanRepository;
+import com.isp.platform.customer.domain.Customer;
+import com.isp.platform.customer.domain.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * RADIUS server integration for PPPoE authentication.
@@ -23,7 +22,6 @@ import java.util.Optional;
 public class RadiusServerService {
 
     private final CustomerRepository customerRepository;
-    private final PlanRepository planRepository;
 
     @Value("${radius.mikrotik-rate-limit-attribute:Mikrotik-Rate-Limit}")
     private String rateLimitAttribute;
