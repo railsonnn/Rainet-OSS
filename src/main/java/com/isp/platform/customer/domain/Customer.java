@@ -24,4 +24,21 @@ public class Customer extends BaseTenantEntity {
 
     @Column(name = "status", nullable = false)
     private String status;
+
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    @Column(name = "blocked")
+    private boolean blocked = false;
+
+    public boolean isActive() {
+        return "ACTIVE".equalsIgnoreCase(status);
+    }
+
+    public boolean isBlocked() {
+        return blocked;
+    }
 }

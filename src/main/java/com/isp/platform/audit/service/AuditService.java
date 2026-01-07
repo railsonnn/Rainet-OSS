@@ -17,12 +17,14 @@ public class AuditService {
     }
 
     @Transactional
-    public void record(String actor, String action, String resource, String payload) {
+    public void record(String actor, AuditLog.AuditAction action, String resourceType, String resourceId, String payload) {
         AuditLog log = new AuditLog();
         log.setActor(actor);
         log.setAction(action);
-        log.setResource(resource);
+        log.setResourceType(resourceType);
+        log.setResourceId(resourceId);
         log.setPayload(payload);
+        log.setStatus(AuditLog.AuditStatus.SUCCESS);
         log.setTenantId(requireTenant());
         repository.save(log);
     }

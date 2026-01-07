@@ -58,8 +58,9 @@ public class RadiusServerService {
                 return createBlockedResponse(customer);
             }
 
-            // Get customer's plan
-            if (customer.getPlan() == null) {
+            // Customer.plan is a String field, not Plan entity
+            String planName = customer.getPlan();
+            if (planName == null || planName.isEmpty()) {
                 log.warn("Customer {} has no plan assigned", request.getUsername());
                 return RadiusAuthRequest.RadiusAuthResponse.builder()
                     .authenticated(false)
@@ -67,7 +68,16 @@ public class RadiusServerService {
                     .build();
             }
 
-            Plan plan = customer.getPlan();
+            // Mock plan data - in production, fetch from PlanRepository
+            int uploadMbps = 5;
+            int downloadMbps = 10;
+            if ("PROFESSIONAL".equalsIgnoreCase(planName)) {
+                uploadMbps = 10;
+                downloadMbps = 50;
+            } else if ("ENTERPRISE".equalsIgnoreCase(planName)) {
+                uploadMbps = 20;
+                downloadMbps = 100;
+            }
 
             // Verify password (in real scenario, use bcrypt)
             if (!verifyPassword(request.getPassword(), customer.getPasswordHash())) {
@@ -79,18 +89,18 @@ public class RadiusServerService {
             }
 
             // Build successful response with plan attributes
-            Map<String, String> attributes = buildMikrotikAttributes(plan);
+            Map<String, String> attributes = buildMikrotikAttributes(uploadMbps, downloadMbps);
 
             RadiusAuthRequest.RadiusAuthResponse response = RadiusAuthRequest.RadiusAuthResponse.builder()
                 .authenticated(true)
-                .profileName(plan.getName())
-                .uploadMbps(plan.getUploadMbps())
-                .downloadMbps(plan.getDownloadMbps())
+                .profileName(planName)
+                .uploadMbps(uploadMbps)
+                .downloadMbps(downloadMbps)
                 .attributes(attributes)
                 .build();
 
             log.info("RADIUS authentication successful for customer: {} with plan: {}", 
-                request.getUsername(), plan.getName());
+                request.getUsername(), planName);
 
             return response;
         } catch (Exception e) {
@@ -105,15 +115,15 @@ public class RadiusServerService {
     /**
      * Build MikroTik-specific RADIUS attributes for rate limiting.
      */
-    private Map<String, String> buildMikrotikAttributes(Plan plan) {
+    private Map<String, String> buildMikrotikAttributes(int uploadMbps, int downloadMbps) {
         Map<String, String> attributes = new HashMap<>();
         
         // MikroTik rate limit format: upload/download in bytes per second
-        long uploadBps = plan.getUploadMbps() * 1_000_000L / 8; // Convert Mbps to bytes/sec
-        long downloadBps = plan.getDownloadMbps() * 1_000_000L / 8;
+        long uploadBps = uploadMbps * 1_000_000L / 8; // Convert Mbps to bytes/sec
+        long downloadBps = downloadMbps * 1_000_000L / 8;
         
         attributes.put(rateLimitAttribute, String.format("%d/%d", uploadBps, downloadBps));
-        attributes.put("Mikrotik-Queue-Name", plan.getName());
+        attributes.put("Mikrotik-Queue-Name", "default");
         attributes.put("Reply-Message", "Welcome to Rainet ISP!");
         
         return attributes;

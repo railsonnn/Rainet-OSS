@@ -111,7 +111,7 @@ public class AuditLogService {
             // Save to database
             auditLogRepository.save(log);
             
-            log.info("Audit log recorded: actor={}, action={}, resource={}/{}, status={}",
+            this.log.info("Audit log recorded: actor={}, action={}, resource={}/{}, status={}",
                 actor, action.name(), resourceType, resourceId, status.name());
         } catch (Exception e) {
             log.error("Failed to record audit log", e);

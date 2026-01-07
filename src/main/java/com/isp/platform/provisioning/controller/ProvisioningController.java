@@ -41,7 +41,7 @@ public class ProvisioningController {
 
     @PostMapping("/rollback/{snapshotId}")
     public ResponseEntity<ApiResponse<String>> rollback(
-            @PathVariable UUID snapshotId,
+            @PathVariable Long snapshotId,
             Principal principal) {
         provisioningService.rollback(snapshotId, principal.getName());
         return ResponseEntity.ok(ApiResponse.ok("rolled back"));

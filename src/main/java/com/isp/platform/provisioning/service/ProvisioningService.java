@@ -54,7 +54,7 @@ public class ProvisioningService {
     }
 
     @Transactional
-    public void rollback(UUID snapshotId, String actor) {
+    public void rollback(Long snapshotId, String actor) {
         UUID tenantId = requireTenant();
         ConfigSnapshot snapshot = snapshotRepository.findById(snapshotId)
                 .filter(s -> tenantId.equals(s.getTenantId()))

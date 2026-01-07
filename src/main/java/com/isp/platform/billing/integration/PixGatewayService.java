@@ -8,6 +8,7 @@ import com.isp.platform.customer.domain.CustomerRepository;
 import com.isp.platform.provisioning.radius.RadiusServerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -87,7 +88,7 @@ public class PixGatewayService {
 
         try {
             // Find invoice by payment ID or invoice ID
-            Optional<Invoice> invoiceOpt = invoiceRepository.findById(Long.parseLong(webhook.getInvoiceId()));
+            Optional<Invoice> invoiceOpt = invoiceRepository.findById(UUID.fromString(webhook.getInvoiceId()));
 
             if (invoiceOpt.isEmpty()) {
                 log.warn("Invoice not found for webhook: {}", webhook.getInvoiceId());
@@ -125,7 +126,7 @@ public class PixGatewayService {
         log.info("Unlocking customer: {}", customerId);
 
         try {
-            Optional<Customer> customerOpt = customerRepository.findById(customerId);
+            Optional<Customer> customerOpt = customerRepository.findById(UUID.fromString(customerId));
 
             if (customerOpt.isEmpty()) {
                 log.warn("Customer not found: {}", customerId);
