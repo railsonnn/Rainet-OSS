@@ -60,6 +60,11 @@ public class BillingController {
     /**
      * PIX payment webhook endpoint.
      * Receives payment confirmation from gateway (Asaas/Gerencianet).
+     * 
+     * SECURITY NOTE: Production systems should implement:
+     * - Webhook signature verification using gateway's shared secret
+     * - IP whitelist to only accept requests from gateway servers
+     * - Timestamp validation to prevent replay attacks
      */
     @PostMapping("/webhook/pix")
     public ResponseEntity<ApiResponse<?>> pixWebhook(@RequestBody PixPaymentRequest.PixWebhook webhook) {

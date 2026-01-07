@@ -10,8 +10,10 @@
   - Support for both Asaas and Gerencianet (Gerencianet is stubbed)
 
 ### 2. API Endpoints
-- **POST `/api/billing/invoices/{invoiceId}/pix`**: Generate PIX QR code
-- **POST `/api/billing/webhook/pix`**: Receive payment webhooks from gateway
+- **POST `/billing/invoices/{invoiceId}/pix`**: Generate PIX QR code (with `/api` context-path: `/api/billing/invoices/{invoiceId}/pix`)
+- **POST `/billing/webhook/pix`**: Receive payment webhooks from gateway (with `/api` context-path: `/api/billing/webhook/pix`)
+
+Note: The `/api` prefix is configured in `application.yml` via `server.servlet.context-path`.
 
 ### 3. Database Changes
 - Added `blocked` column to `customers` table
@@ -79,6 +81,17 @@ app:
 
 ## ⚠️ Known Limitations
 
+### Security Considerations
+1. **Webhook Authentication**: The current implementation does not verify webhook signatures
+   - Production systems should validate webhook signatures from payment gateways
+   - Add signature verification using gateway's shared secret
+   - Consider IP whitelist for webhook sources
+
+2. **Error Handling**: Webhook errors are logged but exceptions are caught
+   - This prevents malicious payloads from crashing the service
+   - Errors are logged for debugging and monitoring
+   - Consider retry queue for failed webhook processing
+
 ### Non-PIX Related Compilation Errors
 The following errors exist in the codebase but are NOT related to PIX billing:
 
@@ -140,6 +153,8 @@ mvn test -Dtest=PixBillingIntegrationTest
 
 - [ ] Configure Asaas API key in production
 - [ ] Set webhook URL to your domain
+- [ ] **SECURITY**: Implement webhook signature verification
+- [ ] **SECURITY**: Configure IP whitelist for webhook sources
 - [ ] Run database migration V2
 - [ ] Configure firewall to allow webhook traffic
 - [ ] Set up monitoring for webhook failures
@@ -149,8 +164,19 @@ mvn test -Dtest=PixBillingIntegrationTest
 
 ## 📚 Next Steps
 
-1. Complete Gerencianet integration (currently stubbed)
-2. Add retry logic for failed webhooks
+### High Priority (Security)
+1. **Implement webhook signature verification**
+   - Validate Asaas webhook signatures using shared secret
+   - Reject unsigned or invalid webhooks
+   - Add timestamp validation to prevent replay attacks
+
+2. **Add IP whitelist for webhooks**
+   - Configure Spring Security to allow only gateway IPs
+   - Log all webhook requests for audit
+
+### Medium Priority (Robustness)
+### Medium Priority (Robustness)
+3. Complete Gerencianet integration (currently stubbed)
 3. Add webhook signature verification for security
 4. Implement payment expiration handling
 5. Add customer notification on payment confirmation
