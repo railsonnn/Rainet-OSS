@@ -8,6 +8,7 @@ import com.isp.platform.provisioning.mikrotik.RouterOsExecutor;
 import com.isp.platform.provisioning.mikrotik.RouterOsScriptGenerator;
 import com.isp.platform.provisioning.snapshot.ConfigSnapshot;
 import com.isp.platform.provisioning.snapshot.ConfigSnapshotRepository;
+import com.isp.platform.provisioning.snapshot.ConfigSnapshotService;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -20,16 +21,19 @@ public class ProvisioningService {
     private final RouterOsScriptGenerator scriptGenerator;
     private final RouterOsExecutor executor;
     private final ConfigSnapshotRepository snapshotRepository;
+    private final ConfigSnapshotService snapshotService;
 
     public ProvisioningService(
             RouterRepository routerRepository,
             RouterOsScriptGenerator scriptGenerator,
             RouterOsExecutor executor,
-            ConfigSnapshotRepository snapshotRepository) {
+            ConfigSnapshotRepository snapshotRepository,
+            ConfigSnapshotService snapshotService) {
         this.routerRepository = routerRepository;
         this.scriptGenerator = scriptGenerator;
         this.executor = executor;
         this.snapshotRepository = snapshotRepository;
+        this.snapshotService = snapshotService;
     }
 
     @Transactional(readOnly = true)
@@ -41,32 +45,22 @@ public class ProvisioningService {
     @Transactional
     public UUID apply(ProvisioningRequest request, String actor) {
         Router router = findRouterForTenant(request.routerId());
+        
+        // Create BEFORE snapshot
+        snapshotService.createBeforeSnapshot(router, actor);
+        
+        // Apply configuration
         String script = scriptGenerator.generateProvisioningScript(router);
-        executor.apply(script);
-
-        ConfigSnapshot snapshot = new ConfigSnapshot();
-        snapshot.setRouter(router);
-        snapshot.setConfigScript(script);
-        snapshot.setDescription(request.description());
-        snapshot.setAppliedBy(actor);
-        snapshotRepository.save(snapshot);
-        return snapshot.getId();
+        executor.applyScript(router, script);
+        
+        // Create AFTER snapshot
+        ConfigSnapshot afterSnapshot = snapshotService.createAfterSnapshot(router, actor);
+        return afterSnapshot.getId();
     }
 
     @Transactional
     public void rollback(UUID snapshotId, String actor) {
-        UUID tenantId = requireTenant();
-        ConfigSnapshot snapshot = snapshotRepository.findById(snapshotId)
-                .filter(s -> tenantId.equals(s.getTenantId()))
-                .orElseThrow(() -> new ApiException("Snapshot not found"));
-        executor.apply(snapshot.getConfigScript());
-
-        ConfigSnapshot rollbackLog = new ConfigSnapshot();
-        rollbackLog.setRouter(snapshot.getRouter());
-        rollbackLog.setConfigScript(snapshot.getConfigScript());
-        rollbackLog.setDescription("Rollback by " + actor);
-        rollbackLog.setAppliedBy(actor);
-        snapshotRepository.save(rollbackLog);
+        snapshotService.performRollback(snapshotId, actor);
     }
 
     @Transactional(readOnly = true)
