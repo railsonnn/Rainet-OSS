@@ -1,7 +1,9 @@
 -- Add snapshot_type and config_hash columns to config_snapshots table
+-- Note: config_hash uses empty string as default for existing records
+-- New records will have proper SHA-256 hashes calculated by the application
 ALTER TABLE config_snapshots
 ADD COLUMN snapshot_type VARCHAR(50) NOT NULL DEFAULT 'AFTER',
-ADD COLUMN config_hash VARCHAR(64) NOT NULL DEFAULT '';
+ADD COLUMN config_hash VARCHAR(64) NOT NULL DEFAULT 'migration-pending';
 
 -- Create index for snapshot_type queries
 CREATE INDEX idx_config_snapshots_router_type ON config_snapshots(router_id, snapshot_type, created_at DESC);

@@ -3,6 +3,7 @@ package com.isp.platform.provisioning.service;
 import com.isp.platform.audit.domain.AuditLog;
 import com.isp.platform.audit.service.AuditService;
 import com.isp.platform.common.exception.ApiException;
+import com.isp.platform.common.util.HashUtil;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.provisioning.domain.Router;
 import com.isp.platform.provisioning.domain.RouterRepository;
@@ -11,9 +12,6 @@ import com.isp.platform.provisioning.mikrotik.RouterOsScriptGenerator;
 import com.isp.platform.provisioning.snapshot.ConfigSnapshot;
 import com.isp.platform.provisioning.snapshot.ConfigSnapshotRepository;
 import com.isp.platform.provisioning.snapshot.ConfigSnapshotService;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -157,7 +155,7 @@ public class ProvisioningService {
     }
 
     private ConfigSnapshot createAfterSnapshot(Router router, String configScript, String description, String actor) {
-        String configHash = calculateSha256(configScript);
+        String configHash = HashUtil.sha256(configScript);
         
         ConfigSnapshot snapshot = new ConfigSnapshot();
         snapshot.setRouter(router);
@@ -169,23 +167,6 @@ public class ProvisioningService {
         snapshot.setAppliedBy(actor);
         
         return snapshotRepository.save(snapshot);
-    }
-
-    private String calculateSha256(String content) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
-        }
     }
 
     private Router findRouterForTenant(UUID routerId) {
