@@ -168,9 +168,15 @@ public class ConfigSnapshotService {
      * Verify snapshot integrity by comparing calculated hash.
      *
      * @param snapshot the snapshot to verify
-     * @return true if hash matches
+     * @return true if hash matches or if it's a legacy snapshot without hash
      */
     public boolean verifySnapshot(ConfigSnapshot snapshot) {
+        // Legacy snapshots created before hash implementation are considered valid
+        if ("LEGACY_SNAPSHOT_NO_HASH".equals(snapshot.getConfigHash())) {
+            log.warn("Skipping verification for legacy snapshot ID: {}", snapshot.getId());
+            return true;
+        }
+        
         String calculatedHash = calculateSha256(snapshot.getConfigScript());
         return calculatedHash.equals(snapshot.getConfigHash());
     }
