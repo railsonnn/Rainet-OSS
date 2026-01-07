@@ -24,4 +24,7 @@ public class Customer extends BaseTenantEntity {
 
     @Column(name = "status", nullable = false)
     private String status;
+
+    @Column(name = "blocked", nullable = false)
+    private boolean blocked = false;
 }
