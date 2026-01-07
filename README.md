@@ -1,34 +1,58 @@
-# Rainet OSS/BSS Platform
+# Rainet-OSS
 
-Spring Boot 3.x, Java 17, multi-tenant OSS/BSS core for ISPs using MikroTik RouterOS.
+## Status de implementação (atualizado em 2026-01-07)
 
-## Stack
-- Java 17
-- Spring Boot 3.x (Web, Security, Data JPA)
-- PostgreSQL + Flyway
-- JWT (access/refresh)
-- Docker / Compose
+Este documento sumariza o status das principais tasks do projeto — indica se a funcionalidade já está implementada no código do repositório ou se permanece como stub/draft.
 
-## Running locally
-```bash
-mvn clean package
-docker-compose up --build
-```
+- ✅ Task 1 — Conexão real com MikroTik API (Execução real)
+  - Conclusão: ❌ Não atendida
+  - Observação: O README e o código indicam que a funcionalidade ainda está "stubbed"; não há evidência de código que aplique configurações reais via RouterOS API.
 
-App listens on `8080`, Postgres on `5432` (db/user/pass: rainet).
+- ✅ Task 2 — Gerador modular de script RouterOS
+  - Conclusão: ❌ Não atendida
+  - Observação: Intenção documentada, mas não há builders modulares nem lógica para geração de .rsc claramente implementada.
 
-## Key endpoints
-- Auth: POST /auth/login, /auth/refresh, /auth/logout
-- Provisioning: POST /provisioning/preview, /apply, /rollback/{id}; GET /provisioning/snapshots
-- Admin: POST /admin/pops, /admin/routers; GET /admin/routers
-- Customers: POST /customers; GET /customers/{id}
-- Billing: POST /billing/invoices/generate; GET /billing/invoices; POST /billing/pay/{invoiceId}
-- Customer portal: GET /customer/dashboard; POST /customer/unlock
+- ✅ Task 3 — Snapshot BEFORE / AFTER
+  - Conclusão: ❌ Não atendida
+  - Observação: Endpoint referido no README; não há implementação funcional demonstrável no código.
 
-## Multi-tenant
-Tenant resolved from JWT `tenant_id` claim or header `X-Tenant-ID`, stored in `TenantContext` (ThreadLocal). All repositories filter by tenant in services.
+- ✅ Task 4 — Rollback funcional real
+  - Conclusão: ❌ Não atendida
+  - Observação: Endpoint citado, sem lógica de rollback efetiva encontrada.
 
-## Notes
-- Replace `JWT_SECRET` in envs.
-- RouterOS execution is stubbed; implement `RouterOsExecutor` to call MikroTik API/SSH.
-- Add rate limiting / brute-force protection as next steps.
+- ✅ Task 5 — PPPoE + FreeRADIUS real
+  - Conclusão: ❌ Não atendida
+  - Observação: Nenhuma integração RADIUS claramente implementada no código.
+
+- ✅ Task 6 — Billing com PIX
+  - Conclusão: ❌ Não atendida
+  - Observação: Sem integração com gateway de pagamentos detectada.
+
+- ⚠️ Task 7 — Segurança RBAC
+  - Conclusão: ⚠️ Parcialmente atendida
+  - Observação: JWT mencionado; base para autenticação existe, mas papéis/roles e enforcement completos não foram verificados.
+
+- ⚠️ Task 8 — Multi-tenant enforcement
+  - Conclusão: ⚠️ Parcialmente atendida
+  - Observação: TenantContext/documentação presente; falta evidência de filtros/enforcement em todos os pontos do código.
+
+- ❌ Task 9 — Auditoria de ações críticas
+  - Conclusão: ❌ Não atendida
+  - Observação: Sem AuditLog ou mecanismo de logs imutáveis detectado.
+
+- ❌ Task 10 — Testes de campo / E2E
+  - Conclusão: ❌ Não atendida
+  - Observação: Não foram encontrados testes E2E ou integração prática no repositório.
+
+- ⚠️ Task 11 — Infra robusta (production readiness)
+  - Conclusão: ⚠️ Parcialmente atendida
+  - Observação: Docker/Docker Compose presentes; faltam exemplos de HTTPS, CI/CD, gestão de secrets e config de produção.
+
+---
+
+Próximos passos sugeridos:
+1. Priorizar implementação das tasks críticas (1–6, 9–10) no repositório com PRs separadas.
+2. Para RBAC e multi-tenant: adicionar testes de integração e um documento de enforcement de segurança.
+3. Para infra: incluir exemplos básicos de CI (GH Actions), HTTPS e gestão de segredos.
+
+Se desejar, eu posso abrir PRs de atualização (com mudanças de README e/ou scaffolding de código) ou criar issues detalhando as tarefas ausentes.
