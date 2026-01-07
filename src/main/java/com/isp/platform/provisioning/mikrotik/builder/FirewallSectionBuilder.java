@@ -6,11 +6,17 @@ import java.util.List;
 
 /**
  * Builds firewall and NAT configuration section.
+ * Includes flood protection (SYN flood, connection rate limiting, port scan detection),
+ * connection tracking, and NAT masquerading.
  * Includes DDoS protection, connection tracking, and masquerading.
  * Uses idempotent commands with comments for identification.
  */
 @Component
 public class FirewallSectionBuilder {
+
+    // Address list names
+    private static final String ADDRESS_LIST_CONNECTION_LIMIT = "connection_limit";
+    private static final String ADDRESS_LIST_PORT_SCANNERS = "port_scanners";
 
     public String build(RouterOsConfig config) {
         StringBuilder sb = new StringBuilder();
@@ -35,6 +41,27 @@ public class FirewallSectionBuilder {
         sb.append(":foreach rule in=[find comment~\"Rainet:\"] do={ /ip/firewall/filter remove $rule }\n");
         
         // Drop invalid connections
+        sb.append("add action=drop chain=input connection-state=invalid comment=\"Drop invalid input\"\n");
+        sb.append("add action=drop chain=forward connection-state=invalid comment=\"Drop invalid forward\"\n");
+        
+        // Flood protection - SYN flood
+        sb.append("add action=drop chain=input protocol=tcp tcp-flags=syn connection-limit=30,32 comment=\"Drop SYN flood\"\n");
+        
+        // Flood protection - Connection rate limiting per IP
+        sb.append("add action=add-src-to-address-list chain=input connection-state=new src-address-list=").append(ADDRESS_LIST_CONNECTION_LIMIT).append(" address-list-timeout=1m comment=\"Track new connections\"\n");
+        sb.append("add action=drop chain=input src-address-list=").append(ADDRESS_LIST_CONNECTION_LIMIT).append(" connection-state=new connection-limit=20,32 comment=\"Drop connection flood\"\n");
+        
+        // Flood protection - Port scan detection
+        sb.append("add action=add-src-to-address-list chain=input protocol=tcp psd=21,3s,3,1 address-list=").append(ADDRESS_LIST_PORT_SCANNERS).append(" address-list-timeout=1d comment=\"Detect port scan\"\n");
+        sb.append("add action=drop chain=input src-address-list=").append(ADDRESS_LIST_PORT_SCANNERS).append(" comment=\"Drop port scanners\"\n");
+        
+        // Flood protection - ICMP rate limiting
+        sb.append("add action=accept chain=input protocol=icmp limit=5,5:packet comment=\"Accept limited ICMP\"\n");
+        sb.append("add action=drop chain=input protocol=icmp comment=\"Drop ICMP flood\"\n");
+        
+        // Accept established and related
+        sb.append("add action=accept chain=input connection-state=established,related comment=\"Accept established/related input\"\n");
+        sb.append("add action=accept chain=forward connection-state=established,related comment=\"Accept established/related forward\"\n");
         sb.append("add action=drop chain=forward connection-state=invalid comment=\"Rainet: Drop invalid\"\n");
         
         // Accept established and related
@@ -46,6 +73,12 @@ public class FirewallSectionBuilder {
                 config.getBridgeInterface(), config.getWanInterface()));
         }
         
+        // Accept from local interfaces (INPUT chain)
+        sb.append("add action=accept chain=input in-interface=!ether1 comment=\"Accept from local\"\n");
+        
+        // Drop other traffic
+        sb.append("add action=drop chain=input comment=\"Drop other input\"\n");
+        sb.append("add action=drop chain=forward comment=\"Drop other forward\"\n");
         // Drop other forward traffic
         sb.append("add action=drop chain=forward comment=\"Rainet: Drop other forward\"\n");
         
