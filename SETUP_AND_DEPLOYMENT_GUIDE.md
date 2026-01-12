@@ -117,25 +117,26 @@ pix:
     api-key: your_asaas_key
     api-url: https://api.asaas.com/v3
 
-jwt:
-  secret: your_very_long_random_jwt_secret_key
-  expiration-ms: 86400000       # 24 hours
+server:
+  servlet:
+    context-path: /api         # All endpoints under /api
 ```
 
 ---
 
 ## 🔐 Step 4: Security Setup
 
-### Generate JWT Secret
+### Authentication
 
-```bash
-# Generate a strong random JWT secret
-openssl rand -base64 32
-# Output: abc123def456ghi789...
+The application uses **HTTP Basic Authentication** with database-backed user store. 
+JWT support has been removed for simplicity.
 
-# Add to application.yml
-jwt.secret: abc123def456ghi789...
-```
+On first startup, a default admin user is created automatically:
+- Username: `admin`
+- Password: `change-me`
+- Tenant: `example`
+
+**IMPORTANT:** Change the default password immediately after first login!
 
 ### Configure HTTPS (Production)
 
@@ -153,20 +154,19 @@ server:
     key-store-type: PKCS12
 ```
 
-### Create Admin User (Initial Setup)
+### Test API with Basic Auth
 
-```sql
--- Insert first admin user into database (after app starts)
--- SQL migration will be created automatically by Flyway
+```bash
+# Test provisioning endpoint with Basic Auth
+curl -u admin:change-me http://localhost:8080/api/provisioning/snapshots \
+  -H "Content-Type: application/json"
 
--- Or via REST API (after app is running):
-curl -X POST http://localhost:8080/api/v1/auth/register \
+# Preview provisioning configuration
+curl -u admin:change-me -X POST http://localhost:8080/api/provisioning/preview \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin@rainet.local",
-    "email": "admin@rainet.local",
-    "password": "SecurePassword123!",
-    "role": "ADMIN"
+    "routerId": "your-router-uuid",
+    "description": "Test configuration"
   }'
 ```
 
@@ -199,10 +199,9 @@ add name=rainet_api group=admin password=StrongPassword123!
 ### Test API Connection
 
 ```bash
-# From Rainet application
-curl -X POST http://localhost:8080/api/v1/provisioning/test-conn \
-  -H "X-Tenant-ID: your-tenant-uuid" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Test connection with Basic Auth
+curl -u admin:change-me -X POST http://localhost:8080/api/provisioning/test-conn \
+  -H "Content-Type: application/json"
 ```
 
 ---

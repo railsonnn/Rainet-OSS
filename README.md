@@ -109,6 +109,46 @@ mvn clean install
 mvn spring-boot:run
 ```
 
+### Executar com Docker Compose
+
+```bash
+# Build e iniciar serviços (PostgreSQL + aplicação)
+docker-compose up --build
+
+# A aplicação estará disponível em http://localhost:8080/api
+# Credenciais padrão: username=admin, password=change-me
+```
+
+### Testar Endpoints com HTTP Basic Auth
+
+Todos os endpoints agora usam autenticação HTTP Basic (DB-backed) e estão sob o path `/api`:
+
+```bash
+# Testar endpoint de preview de provisionamento
+curl -u admin:change-me http://localhost:8080/api/provisioning/preview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routerId": "UUID-do-router",
+    "description": "Teste de configuração"
+  }'
+
+# Aplicar configuração (retorna snapshotId)
+curl -u admin:change-me -X POST http://localhost:8080/api/provisioning/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routerId": "UUID-do-router",
+    "description": "Aplicar configuração"
+  }'
+
+# Fazer rollback de um snapshot
+curl -u admin:change-me -X POST http://localhost:8080/api/provisioning/rollback/{snapshotId}
+
+# Listar snapshots
+curl -u admin:change-me http://localhost:8080/api/provisioning/snapshots
+```
+
+**Nota:** Suporte a JWT foi removido. A aplicação agora usa autenticação HTTP Basic com backend em banco de dados PostgreSQL.
+
 ---
 
 ## Próximos Passos Recomendados
@@ -129,18 +169,25 @@ Projeto interno. Não adicionar cabeçalhos de licença a menos que solicitado.
 
 Estado e próximos passos do projeto Rainet-OSS.
 
-## Status (atualizado em 2026-01-07)
+## Status (atualizado em 2026-01-12)
 
-- RouterOS API (execução real): ❌ pendente — código ainda descrito como stub; faltam chamadas efetivas à RouterOS API.
-- Gerador modular de scripts (.rsc): ❌ pendente — intenção documentada, mas não há builders modulares claros no código revisado.
-- Snapshots BEFORE/AFTER e rollback: ❌ pendente — endpoints citados, sem lógica funcional comprovada.
-- PPPoE + FreeRADIUS: ❌ pendente — nenhuma integração RADIUS evidente.
-- Billing via PIX: ❌ pendente — sem integração com gateway de pagamentos.
-- Segurança RBAC: ⚠️ parcial — autenticação/JWT citados; papéis e enforcement completo não verificados.
-- Multi-tenant enforcement: ⚠️ parcial — há TenantContext/documentação; falta evidência de filtros em todos os fluxos.
-- Auditoria de ações críticas: ❌ pendente — ausência de mecanismo de audit log imutável.
-- Testes de campo / E2E: ❌ pendente — não há testes E2E encontrados.
-- Infra para produção: ⚠️ parcial — há Docker/Docker Compose; faltam exemplos de HTTPS, CI/CD, segredos e config de produção.
+- RouterOS API (execução real): ✅ implementado — `RouterOsApiExecutor` conecta via API RouterOS (porta 8728) e executa scripts reais.
+- Gerador modular de scripts (.rsc): ✅ implementado — `RouterOsScriptBuilder` com 8 builders modulares gera scripts idempotentes.
+- Snapshots BEFORE/AFTER e rollback: ✅ implementado — `ProvisioningController` e `ProvisioningService` com endpoints /preview, /apply, /rollback.
+- Segurança RBAC: ✅ implementado — HTTP Basic Auth DB-backed substituiu JWT; roles mapeadas para Spring Security GrantedAuthority.
+- Multi-tenant enforcement: ✅ implementado — TenantContext e enforcement por tenant nos serviços.
+- PPPoE + FreeRADIUS: ⚠️ parcial — estrutura presente, integração real pendente.
+- Billing via PIX: ⚠️ parcial — Asaas implementado, Gerencianet pendente.
+- Auditoria de ações críticas: ✅ implementado — `AuditLog` com enums e serviços de auditoria.
+- Testes de campo / E2E: ❌ pendente — suíte definida, implementação pendente.
+- Infra para produção: ⚠️ parcial — Docker/Docker Compose configurados; HTTPS, CI/CD pendentes.
+
+**Mudanças recentes:**
+- JWT removido, substituído por HTTP Basic Auth com backend em banco de dados
+- Base path configurado como `/api` para todos os endpoints
+- RouterOS API com escaping seguro de nomes de arquivos
+- DataInitializer cria tenant e usuário admin automaticamente na primeira inicialização
+- Endpoints de provisioning corrigidos e validados
 
 ## Próximos passos sugeridos
 
