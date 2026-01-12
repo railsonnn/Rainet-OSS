@@ -64,8 +64,8 @@ public class DataInitializer implements ApplicationRunner {
         admin.setRoles(Set.of(Role.ADMIN));
         userAccountRepository.save(admin);
         
-        log.info("Created admin user: {} (password: change-me)", admin.getUsername());
-        log.warn("IMPORTANT: Change the default admin password immediately!");
-        log.info("You can now authenticate with: username=admin, password=change-me");
+        log.info("Created admin user: {}", admin.getUsername());
+        log.warn("IMPORTANT: Default admin user created - change the password immediately!");
+        log.info("Default admin credentials are documented in SETUP_AND_DEPLOYMENT_GUIDE.md");
     }
 }

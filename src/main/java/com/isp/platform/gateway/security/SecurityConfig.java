@@ -2,7 +2,7 @@ package com.isp.platform.gateway.security;
 
 import com.isp.platform.gateway.auth.UserAccount;
 import com.isp.platform.gateway.auth.UserAccountRepository;
-import com.isp.platform.gateway.tenant.TenantContext;
+import com.isp.platform.gateway.tenant.TenantResolverFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.util.stream.Collectors;
 
@@ -30,9 +31,13 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
     private final UserAccountRepository userAccountRepository;
+    private final TenantAuthenticationFilter tenantAuthenticationFilter;
 
-    public SecurityConfig(UserAccountRepository userAccountRepository) {
+    public SecurityConfig(
+            UserAccountRepository userAccountRepository,
+            TenantAuthenticationFilter tenantAuthenticationFilter) {
         this.userAccountRepository = userAccountRepository;
+        this.tenantAuthenticationFilter = tenantAuthenticationFilter;
     }
 
     @Bean
@@ -43,6 +48,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())
+                .addFilterBefore(new TenantResolverFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(tenantAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(basic -> {});
         return http.build();
     }
@@ -50,15 +57,12 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
-            // Note: In a multi-tenant system, we would need tenant context
-            // For Basic Auth, we'll look up user by username across all tenants
-            // In production, consider adding tenant identifier to username (e.g., user@tenant)
+            // Note: In a multi-tenant system with Basic Auth, we look up user by username across all tenants
+            // Tenant context is set via X-Tenant-ID header in TenantResolverFilter
+            // For production, consider encoding tenant in username (e.g., user@tenant) or using custom auth
             UserAccount userAccount = userAccountRepository.findByUsername(username)
                     .filter(UserAccount::isEnabled)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-            
-            // Set tenant context from user's tenant
-            TenantContext.setCurrentTenant(userAccount.getTenantId());
             
             // Map domain roles to Spring Security GrantedAuthority
             var authorities = userAccount.getRoles().stream()
