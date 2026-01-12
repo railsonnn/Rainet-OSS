@@ -44,15 +44,27 @@ public class SecurityConfig {
     public UserDetailsService userDetailsService() {
         // In-memory users for testing/POC
         // TODO: Replace with database-backed UserDetailsService for production
+        // TODO: Move credentials to environment variables or secure configuration
+        
+        String adminPassword = System.getenv("BASIC_AUTH_ADMIN_PASSWORD");
+        if (adminPassword == null || adminPassword.isEmpty()) {
+            adminPassword = "admin123"; // Fallback for dev/testing only
+        }
+        
+        String billingPassword = System.getenv("BASIC_AUTH_BILLING_PASSWORD");
+        if (billingPassword == null || billingPassword.isEmpty()) {
+            billingPassword = "billing123"; // Fallback for dev/testing only
+        }
+        
         UserDetails admin = User.builder()
                 .username("admin")
-                .password(passwordEncoder().encode("admin123"))
+                .password(passwordEncoder().encode(adminPassword))
                 .roles("ADMIN", "TECH")
                 .build();
 
         UserDetails billing = User.builder()
                 .username("billing")
-                .password(passwordEncoder().encode("billing123"))
+                .password(passwordEncoder().encode(billingPassword))
                 .roles("BILLING")
                 .build();
 

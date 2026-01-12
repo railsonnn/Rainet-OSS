@@ -19,6 +19,9 @@ services:
       DB_USER: rainet
       DB_PASS: rainet
       SPRING_SERVLET_CONTEXT_PATH: /api
+      # Optional: Override default Basic Auth credentials (defaults shown)
+      # BASIC_AUTH_ADMIN_PASSWORD: admin123
+      # BASIC_AUTH_BILLING_PASSWORD: billing123
     ports:
       - "8080:8080"
     command: ["java","-jar","/app/app.jar"]

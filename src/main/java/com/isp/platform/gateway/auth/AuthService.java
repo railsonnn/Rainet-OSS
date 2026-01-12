@@ -41,27 +41,17 @@ public class AuthService {
      * Authenticate user credentials.
      * 
      * TODO: This method previously returned JWT tokens. With Basic Auth, this endpoint
-     * may not be needed, or should be reimplemented to return a different response.
-     * For now, it validates credentials and returns a simple success response.
+     * is no longer applicable and should be removed or reimplemented.
+     * 
+     * @deprecated This method is not supported with Basic Authentication.
+     * Use HTTP Basic Auth instead of calling this endpoint.
      */
+    @Deprecated
     @Transactional(readOnly = true)
     public AuthTokens login(LoginRequest request) {
-        Tenant tenant = tenantRepository.findByCode(request.tenantCode())
-                .filter(Tenant::isActive)
-                .orElseThrow(() -> new ApiException("Tenant not found or inactive"));
-
-        UUID tenantId = tenant.getId();
-        UserAccount user = userRepository.findByUsernameAndTenantId(request.username(), tenantId)
-                .filter(UserAccount::isEnabled)
-                .orElseThrow(() -> new ApiException("Invalid credentials"));
-
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new ApiException("Invalid credentials");
-        }
-
-        TenantContext.setCurrentTenant(tenantId);
-        // TODO: Return appropriate response for Basic Auth flow
-        return new AuthTokens("", ""); // Placeholder - needs reimplementation
+        // With Basic Auth, login endpoints are not needed
+        // Authentication happens via HTTP Basic Auth header on each request
+        throw new ApiException("Login endpoint not supported with Basic Auth. Please use HTTP Basic Authentication header.");
     }
 
     /**
@@ -69,10 +59,15 @@ public class AuthService {
      * 
      * TODO: This method is no longer applicable with Basic Auth.
      * Consider removing this endpoint or implementing alternative token refresh strategy.
+     * 
+     * @deprecated This method is not supported with Basic Authentication.
+     * Use HTTP Basic Auth instead of token refresh.
      */
+    @Deprecated
     public AuthTokens refresh(RefreshRequest request) {
-        // TODO: Implement alternative refresh strategy or remove this method
-        throw new ApiException("Token refresh not supported with Basic Auth. Please use HTTP Basic Authentication.");
+        // With Basic Auth, refresh endpoints are not needed
+        // Authentication happens via HTTP Basic Auth header on each request
+        throw new ApiException("Token refresh not supported with Basic Auth. Please use HTTP Basic Authentication header.");
     }
 
     /**
@@ -80,9 +75,14 @@ public class AuthService {
      * 
      * TODO: With Basic Auth, logout is handled by the client discarding credentials.
      * This method may not be needed or should be reimplemented for session invalidation.
+     * 
+     * @deprecated This method is not applicable with Basic Authentication.
+     * Logout is handled client-side by discarding credentials.
      */
+    @Deprecated
     public void logout(String refreshToken) {
-        // TODO: Implement logout for Basic Auth or remove this method
         // With Basic Auth, logout is handled client-side
+        // No server-side action needed
+        throw new ApiException("Logout not supported with Basic Auth. Client should discard credentials.");
     }
 }

@@ -134,6 +134,20 @@ curl -u admin:admin123 -X POST http://localhost:8080/api/provisioning/rollback/{
 - Admin: `admin` / `admin123` (roles: ADMIN, TECH)
 - Billing: `billing` / `billing123` (role: BILLING)
 
+**Configurando credenciais customizadas via variáveis de ambiente:**
+```bash
+export BASIC_AUTH_ADMIN_PASSWORD=your_secure_admin_password
+export BASIC_AUTH_BILLING_PASSWORD=your_secure_billing_password
+mvn spring-boot:run
+```
+
+Ou no docker-compose.yml:
+```yaml
+environment:
+  BASIC_AUTH_ADMIN_PASSWORD: your_secure_admin_password
+  BASIC_AUTH_BILLING_PASSWORD: your_secure_billing_password
+```
+
 **IMPORTANTE:** Estas credenciais são armazenadas em memória e destinam-se apenas a ambientes de teste. 
 Para produção, migre para UserDetailsService baseado em banco de dados.
 
