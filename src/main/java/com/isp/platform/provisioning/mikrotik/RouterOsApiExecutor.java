@@ -74,7 +74,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             
             // Execute the script using /import with proper parameter formatting
             log.debug("Executing /import for script: {}", fileName);
-            String importCommand = String.format("/import =file-name=%s", fileName);
+            String importCommand = String.format("/import =file-name=%s", quoteForApi(fileName));
             conn.execute(importCommand);
             
             // Clean up temporary script file
@@ -212,9 +212,11 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         }
         
         try {
+            // Use quoted name to avoid word-splitting/injection in command
+            String quotedFile = quoteForApi(fileName);
             // Remove the file using ID-based removal
             List<Map<String, String>> files = conn.execute(
-                String.format("/file/print ?name=%s", fileName));
+                String.format("/file/print ?name=%s", quotedFile));
             if (!files.isEmpty() && files.get(0).containsKey(".id")) {
                 String fileId = files.get(0).get(".id");
                 conn.execute(String.format("/file/remove =.id=%s", fileId));
@@ -223,7 +225,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             // Also remove the system script using ID-based removal
             try {
                 List<Map<String, String>> scripts = conn.execute(
-                    String.format("/system/script/print ?name=%s", scriptName));
+                    String.format("/system/script/print ?name=%s", quoteForApi(scriptName)));
                 if (!scripts.isEmpty() && scripts.get(0).containsKey(".id")) {
                     String scriptId = scripts.get(0).get(".id");
                     conn.execute(String.format("/system/script/remove =.id=%s", scriptId));
@@ -244,5 +246,15 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
         return String.format("rainet_%s_%s", 
                 TIMESTAMP_FORMATTER.format(LocalDateTime.now()), 
                 UUID.randomUUID().toString().substring(0, 8));
+    }
+
+    /**
+     * Quote a string for use in RouterOS API commands.
+     * Removes any existing quotes and wraps the string in quotes to prevent injection.
+     */
+    private String quoteForApi(String raw) {
+        // Simple quotation; the API expects quoted names to avoid splitting. Raw must not contain quotes.
+        String sanitized = raw.replace("\"", "");
+        return String.format("\"%s\"", sanitized);
     }
 }

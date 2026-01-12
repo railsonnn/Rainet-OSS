@@ -35,14 +35,20 @@ public class ProvisioningController {
     public ResponseEntity<ApiResponse<Map<String, UUID>>> apply(
             @Valid @RequestBody ProvisioningRequest request,
             Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized"));
+        }
         UUID snapshotId = provisioningService.apply(request, principal.getName());
         return ResponseEntity.ok(ApiResponse.ok(Map.of("snapshotId", snapshotId)));
     }
 
     @PostMapping("/rollback/{snapshotId}")
     public ResponseEntity<ApiResponse<String>> rollback(
-            @PathVariable Long snapshotId,
+            @PathVariable UUID snapshotId,
             Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized"));
+        }
         provisioningService.rollback(snapshotId, principal.getName());
         return ResponseEntity.ok(ApiResponse.ok("rolled back"));
     }
