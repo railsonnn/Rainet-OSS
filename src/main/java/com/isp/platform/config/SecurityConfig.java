@@ -26,6 +26,8 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -58,13 +60,13 @@ public class SecurityConfig {
         
         UserDetails admin = User.builder()
                 .username("admin")
-                .password(passwordEncoder().encode(adminPassword))
+                .password(passwordEncoder.encode(adminPassword))
                 .roles("ADMIN", "TECH")
                 .build();
 
         UserDetails billing = User.builder()
                 .username("billing")
-                .password(passwordEncoder().encode(billingPassword))
+                .password(passwordEncoder.encode(billingPassword))
                 .roles("BILLING")
                 .build();
 
@@ -73,6 +75,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return passwordEncoder;
     }
 }

@@ -1,13 +1,9 @@
 package com.isp.platform.gateway.auth;
 
 import com.isp.platform.common.exception.ApiException;
-import com.isp.platform.gateway.security.Role;
-import com.isp.platform.gateway.security.TokenType;
 import com.isp.platform.gateway.tenant.Tenant;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.gateway.tenant.TenantRepository;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
