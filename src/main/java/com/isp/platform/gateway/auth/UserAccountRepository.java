@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
     Optional<UserAccount> findByUsernameAndTenantId(String username, UUID tenantId);
     boolean existsByUsernameAndTenantId(String username, UUID tenantId);
+    Optional<UserAccount> findByUsernameAndEnabled(String username, boolean enabled);
 }

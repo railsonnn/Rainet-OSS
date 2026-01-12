@@ -60,11 +60,8 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
-            // Find user across all tenants by username
-            // Note: In a multi-tenant setup, you might want to include tenant context
-            UserAccount userAccount = userAccountRepository.findAll().stream()
-                    .filter(u -> u.getUsername().equals(username) && u.isEnabled())
-                    .findFirst()
+            // Load user from database using efficient query
+            UserAccount userAccount = userAccountRepository.findByUsernameAndEnabled(username, true)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
             return User.builder()

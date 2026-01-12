@@ -56,7 +56,9 @@ public class DataInitializer implements CommandLineRunner {
             tenant = tenantRepository.save(tenant);
             log.info("Created default tenant: {}", tenant.getCode());
         } else {
-            tenant = tenantRepository.findAll().get(0);
+            tenant = tenantRepository.findAll().stream()
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No tenant found despite count > 0"));
             log.info("Using existing tenant: {}", tenant.getCode());
         }
 
