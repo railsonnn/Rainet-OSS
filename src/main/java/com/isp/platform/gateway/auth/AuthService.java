@@ -1,81 +1,84 @@
 package com.isp.platform.gateway.auth;
 
 import com.isp.platform.common.exception.ApiException;
-import com.isp.platform.gateway.security.JwtTokenProvider;
-import com.isp.platform.gateway.security.Role;
-import com.isp.platform.gateway.security.TokenType;
 import com.isp.platform.gateway.tenant.Tenant;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.gateway.tenant.TenantRepository;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Authentication service.
+ * 
+ * TODO: This service previously used JWT tokens. With the migration to HTTP Basic Auth,
+ * the login/refresh/logout endpoints need to be reimplemented or removed.
+ * Consider implementing session-based authentication or a different token strategy
+ * if stateless authentication is still required.
+ */
 @Service
 public class AuthService {
 
     private final UserAccountRepository userRepository;
     private final TenantRepository tenantRepository;
-    private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
 
     public AuthService(
             UserAccountRepository userRepository,
             TenantRepository tenantRepository,
-            JwtTokenProvider tokenProvider,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
-        this.tokenProvider = tokenProvider;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Authenticate user credentials.
+     * 
+     * TODO: This method previously returned JWT tokens. With Basic Auth, this endpoint
+     * is no longer applicable and should be removed or reimplemented.
+     * 
+     * @deprecated This method is not supported with Basic Authentication.
+     * Use HTTP Basic Auth instead of calling this endpoint.
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public AuthTokens login(LoginRequest request) {
-        Tenant tenant = tenantRepository.findByCode(request.tenantCode())
-                .filter(Tenant::isActive)
-                .orElseThrow(() -> new ApiException("Tenant not found or inactive"));
-
-        UUID tenantId = tenant.getId();
-        UserAccount user = userRepository.findByUsernameAndTenantId(request.username(), tenantId)
-                .filter(UserAccount::isEnabled)
-                .orElseThrow(() -> new ApiException("Invalid credentials"));
-
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new ApiException("Invalid credentials");
-        }
-
-        TenantContext.setCurrentTenant(tenantId);
-        return new AuthTokens(
-                tokenProvider.generateAccessToken(user),
-                tokenProvider.generateRefreshToken(user));
+        // With Basic Auth, login endpoints are not needed
+        // Authentication happens via HTTP Basic Auth header on each request
+        throw new ApiException("Login endpoint not supported with Basic Auth. Please use HTTP Basic Authentication header.");
     }
 
+    /**
+     * Refresh authentication token.
+     * 
+     * TODO: This method is no longer applicable with Basic Auth.
+     * Consider removing this endpoint or implementing alternative token refresh strategy.
+     * 
+     * @deprecated This method is not supported with Basic Authentication.
+     * Use HTTP Basic Auth instead of token refresh.
+     */
+    @Deprecated
     public AuthTokens refresh(RefreshRequest request) {
-        String token = request.refreshToken();
-        if (!tokenProvider.validate(token) || !tokenProvider.isRefreshToken(token)) {
-            throw new ApiException("Invalid refresh token");
-        }
-        Claims claims = tokenProvider.getClaims(token);
-        String username = claims.getSubject();
-        UUID tenantId = UUID.fromString((String) claims.get("tenant_id"));
-        TenantContext.setCurrentTenant(tenantId);
-        UserAccount user = userRepository.findByUsernameAndTenantId(username, tenantId)
-                .orElseThrow(() -> new ApiException("User not found"));
-        return new AuthTokens(
-                tokenProvider.generateAccessToken(user),
-                tokenProvider.generateRefreshToken(user));
+        // With Basic Auth, refresh endpoints are not needed
+        // Authentication happens via HTTP Basic Auth header on each request
+        throw new ApiException("Token refresh not supported with Basic Auth. Please use HTTP Basic Authentication header.");
     }
 
+    /**
+     * Logout user.
+     * 
+     * TODO: With Basic Auth, logout is handled by the client discarding credentials.
+     * This method may not be needed or should be reimplemented for session invalidation.
+     * 
+     * @deprecated This method is not applicable with Basic Authentication.
+     * Logout is handled client-side by discarding credentials.
+     */
+    @Deprecated
     public void logout(String refreshToken) {
-        // Stateless JWT: client discards tokens; implement blacklist/rotation later.
-        if (!tokenProvider.validate(refreshToken)) {
-            throw new ApiException("Invalid token");
-        }
+        // With Basic Auth, logout is handled client-side
+        // No server-side action needed
+        throw new ApiException("Logout not supported with Basic Auth. Client should discard credentials.");
     }
 }

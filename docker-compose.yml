@@ -18,7 +18,10 @@ services:
       DB_URL: jdbc:postgresql://db:5432/rainet
       DB_USER: rainet
       DB_PASS: rainet
-      JWT_SECRET: change-me-secret-change-me-secret-change-me
+      SPRING_SERVLET_CONTEXT_PATH: /api
+      # Optional: Override default Basic Auth credentials (defaults shown)
+      # BASIC_AUTH_ADMIN_PASSWORD: admin123
+      # BASIC_AUTH_BILLING_PASSWORD: billing123
     ports:
       - "8080:8080"
     command: ["java","-jar","/app/app.jar"]

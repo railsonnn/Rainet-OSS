@@ -126,17 +126,6 @@ jwt:
 
 ## 🔐 Step 4: Security Setup
 
-### Generate JWT Secret
-
-```bash
-# Generate a strong random JWT secret
-openssl rand -base64 32
-# Output: abc123def456ghi789...
-
-# Add to application.yml
-jwt.secret: abc123def456ghi789...
-```
-
 ### Configure HTTPS (Production)
 
 ```bash
@@ -153,21 +142,49 @@ server:
     key-store-type: PKCS12
 ```
 
-### Create Admin User (Initial Setup)
+### HTTP Basic Authentication
+
+The application uses HTTP Basic Authentication with in-memory users for testing/POC:
+
+**Default credentials:**
+- Username: `admin` / Password: `admin123` (Roles: ADMIN, TECH)
+- Username: `billing` / Password: `billing123` (Role: BILLING)
+
+**Testing authentication:**
+
+```bash
+# Test with admin credentials
+curl -u admin:admin123 http://localhost:8080/api/provisioning/snapshots
+
+# Test with billing credentials
+curl -u billing:billing123 http://localhost:8080/api/billing/invoices
+```
+
+**IMPORTANT:** The in-memory user configuration is for testing and POC environments only.
+For production, migrate to a database-backed UserDetailsService or external authentication provider.
+
+### Create Admin User (Production Setup)
 
 ```sql
--- Insert first admin user into database (after app starts)
--- SQL migration will be created automatically by Flyway
+-- For production, implement database-backed user management
+-- TODO: Create migration scripts for user tables
+-- TODO: Implement UserDetailsService with database backend
 
--- Or via REST API (after app is running):
-curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin@rainet.local",
-    "email": "admin@rainet.local",
-    "password": "SecurePassword123!",
-    "role": "ADMIN"
-  }'
+-- Example user table structure:
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_roles (
+    user_id UUID REFERENCES users(id),
+    role VARCHAR(50) NOT NULL,
+    PRIMARY KEY (user_id, role)
+);
 ```
 
 ---
@@ -199,10 +216,9 @@ add name=rainet_api group=admin password=StrongPassword123!
 ### Test API Connection
 
 ```bash
-# From Rainet application
-curl -X POST http://localhost:8080/api/v1/provisioning/test-conn \
-  -H "X-Tenant-ID: your-tenant-uuid" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# From Rainet application (using Basic Auth)
+curl -u admin:admin123 -X POST http://localhost:8080/api/provisioning/test-conn \
+  -H "X-Tenant-ID: your-tenant-uuid"
 ```
 
 ---
@@ -288,10 +304,9 @@ export GERENCIANET_CLIENT_SECRET="your_client_secret"
 ### Test PIX Webhook
 
 ```bash
-# Generate invoice and QR code
-curl -X POST http://localhost:8080/api/v1/billing/pix/generate \
+# Generate invoice and QR code (using Basic Auth)
+curl -u admin:admin123 -X POST http://localhost:8080/api/billing/pix/generate \
   -H "X-Tenant-ID: your-tenant-uuid" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "customerId": "cust_123",
@@ -300,7 +315,7 @@ curl -X POST http://localhost:8080/api/v1/billing/pix/generate \
   }'
 
 # Simulate webhook callback (for testing)
-curl -X POST http://localhost:8080/api/v1/billing/pix/webhook \
+curl -X POST http://localhost:8080/api/billing/pix/webhook \
   -H "Content-Type: application/json" \
   -d '{
     "eventId": "evt_123",
@@ -426,10 +441,9 @@ radtest test@customer.com password123 127.0.0.1 0 your_radius_secret
 ### Test PIX Payment
 
 ```bash
-# Create invoice
-curl -X POST http://localhost:8080/api/v1/invoices \
+# Create invoice (using Basic Auth)
+curl -u admin:admin123 -X POST http://localhost:8080/api/invoices \
      -H "X-Tenant-ID: your-tenant-id" \
-     -H "Authorization: Bearer TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "customerId": "cust_123",
@@ -438,9 +452,8 @@ curl -X POST http://localhost:8080/api/v1/invoices \
      }'
 
 # Generate QR code
-curl -X POST http://localhost:8080/api/v1/billing/pix/generate \
+curl -u admin:admin123 -X POST http://localhost:8080/api/billing/pix/generate \
      -H "X-Tenant-ID: your-tenant-id" \
-     -H "Authorization: Bearer TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "invoiceId": "inv_123"
