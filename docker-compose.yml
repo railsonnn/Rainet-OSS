@@ -18,7 +18,7 @@ services:
       DB_URL: jdbc:postgresql://db:5432/rainet
       DB_USER: rainet
       DB_PASS: rainet
-      JWT_SECRET: change-me-secret-change-me-secret-change-me
+      SPRING_SERVLET_CONTEXT_PATH: /api
     ports:
       - "8080:8080"
     command: ["java","-jar","/app/app.jar"]

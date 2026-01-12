@@ -109,6 +109,34 @@ mvn clean install
 mvn spring-boot:run
 ```
 
+4) Testar com autenticação HTTP Basic:
+
+```bash
+# Test provisioning endpoints (requires ADMIN or TECH role)
+curl -u admin:admin123 http://localhost:8080/api/provisioning/snapshots
+
+# Test billing endpoints (requires ADMIN or BILLING role)
+curl -u billing:billing123 http://localhost:8080/api/billing/invoices
+
+# Apply provisioning configuration
+curl -u admin:admin123 -X POST http://localhost:8080/api/provisioning/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routerId": "your-router-uuid",
+    "description": "Initial configuration"
+  }'
+
+# Rollback to previous snapshot
+curl -u admin:admin123 -X POST http://localhost:8080/api/provisioning/rollback/{snapshotId}
+```
+
+**Credenciais padrão (apenas para teste/POC):**
+- Admin: `admin` / `admin123` (roles: ADMIN, TECH)
+- Billing: `billing` / `billing123` (role: BILLING)
+
+**IMPORTANTE:** Estas credenciais são armazenadas em memória e destinam-se apenas a ambientes de teste. 
+Para produção, migre para UserDetailsService baseado em banco de dados.
+
 ---
 
 ## Próximos Passos Recomendados
@@ -136,7 +164,7 @@ Estado e próximos passos do projeto Rainet-OSS.
 - Snapshots BEFORE/AFTER e rollback: ❌ pendente — endpoints citados, sem lógica funcional comprovada.
 - PPPoE + FreeRADIUS: ❌ pendente — nenhuma integração RADIUS evidente.
 - Billing via PIX: ❌ pendente — sem integração com gateway de pagamentos.
-- Segurança RBAC: ⚠️ parcial — autenticação/JWT citados; papéis e enforcement completo não verificados.
+- Segurança RBAC: ✅ implementado — HTTP Basic Auth com roles ADMIN, TECH, BILLING; em memória para POC.
 - Multi-tenant enforcement: ⚠️ parcial — há TenantContext/documentação; falta evidência de filtros em todos os fluxos.
 - Auditoria de ações críticas: ❌ pendente — ausência de mecanismo de audit log imutável.
 - Testes de campo / E2E: ❌ pendente — não há testes E2E encontrados.
