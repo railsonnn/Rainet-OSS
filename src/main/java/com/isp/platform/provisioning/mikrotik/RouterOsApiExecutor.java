@@ -169,7 +169,7 @@ public class RouterOsApiExecutor implements RouterOsExecutor {
             // Using ?name= query format for safe filtering
             try {
                 List<Map<String, String>> existingScripts = conn.execute(
-                    String.format("/system/script/print ?name=%s", scriptName));
+                    String.format("/system/script/print ?name=%s", quoteForApi(scriptName)));
                 if (!existingScripts.isEmpty() && existingScripts.get(0).containsKey(".id")) {
                     String scriptId = existingScripts.get(0).get(".id");
                     // Using =.id= format for ID-based removal (safe, no injection risk)

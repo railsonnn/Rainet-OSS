@@ -1,6 +1,8 @@
 package com.isp.platform.gateway.security;
 
-import com.isp.platform.gateway.tenant.TenantResolverFilter;
+import com.isp.platform.gateway.auth.UserAccount;
+import com.isp.platform.gateway.auth.UserAccountRepository;
+import com.isp.platform.gateway.tenant.TenantContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -8,19 +10,29 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.stream.Collectors;
+
+/**
+ * Security configuration using HTTP Basic Authentication with database-backed user store.
+ * Removed JWT support - Basic Auth validates credentials against UserAccount table.
+ */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtTokenProvider tokenProvider;
+    private final UserAccountRepository userAccountRepository;
 
-    public SecurityConfig(JwtTokenProvider tokenProvider) {
-        this.tokenProvider = tokenProvider;
+    public SecurityConfig(UserAccountRepository userAccountRepository) {
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Bean
@@ -29,11 +41,37 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/auth/login", "/auth/refresh").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new TenantResolverFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class);
+                .httpBasic(basic -> {});
         return http.build();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            // Note: In a multi-tenant system, we would need tenant context
+            // For Basic Auth, we'll look up user by username across all tenants
+            // In production, consider adding tenant identifier to username (e.g., user@tenant)
+            UserAccount userAccount = userAccountRepository.findByUsername(username)
+                    .filter(UserAccount::isEnabled)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+            
+            // Set tenant context from user's tenant
+            TenantContext.setCurrentTenant(userAccount.getTenantId());
+            
+            // Map domain roles to Spring Security GrantedAuthority
+            var authorities = userAccount.getRoles().stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                    .collect(Collectors.toList());
+            
+            return User.builder()
+                    .username(userAccount.getUsername())
+                    .password(userAccount.getPasswordHash())
+                    .authorities(authorities)
+                    .disabled(!userAccount.isEnabled())
+                    .build();
+        };
     }
 
     @Bean
