@@ -8,6 +8,52 @@ Este README resume a proposta original do projeto e explicita, de forma objetiva
 
 ---
 
+## API Base Path
+
+**Todas as requisições devem usar o base path `/api`**
+
+Exemplo: `http://localhost:8080/api/provisioning/preview`
+
+---
+
+## Autenticação
+
+A aplicação agora usa **HTTP Basic Authentication** com usuários armazenados no banco de dados.
+
+### Credenciais Padrão
+
+Após o primeiro startup, um usuário administrador é criado automaticamente:
+
+- **Username**: `admin`
+- **Password**: `change-me`
+- **Tenant**: `default`
+
+⚠️ **IMPORTANTE**: Altere a senha padrão imediatamente após o primeiro acesso!
+
+### Usando Basic Auth com curl
+
+```bash
+# Exemplo: Preview de provisionamento
+curl -u admin:change-me \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"routerId": "uuid-here", "description": "test"}' \
+  http://localhost:8080/api/provisioning/preview
+
+# Exemplo: Health check (não requer autenticação)
+curl http://localhost:8080/api/actuator/health
+```
+
+### Migração de JWT para Basic Auth
+
+- **Removido**: Suporte a JWT (JwtTokenProvider, JwtAuthenticationFilter)
+- **Adicionado**: UserDetailsService carregando usuários do banco de dados
+- **Adicionado**: DataInitializer criando usuário admin padrão no primeiro startup
+- O endpoint `/auth/login` agora retorna tokens vazios (placeholder) para compatibilidade
+- Recomenda-se migrar clientes para usar Basic Authentication diretamente
+
+---
+
 ## Proposta Original e Status das Tarefas
 
 - Automação RouterOS (conexão, execução de scripts, exportação compacta)
@@ -107,6 +153,24 @@ Documentação complementar:
 ```bash
 mvn clean install
 mvn spring-boot:run
+```
+
+4) Após o startup, use as credenciais padrão para acessar:
+   - Username: `admin`
+   - Password: `change-me`
+   - Todas as requisições devem usar o base path `/api`
+
+### Usando Docker Compose
+
+```bash
+# Build e iniciar os containers
+docker-compose up --build
+
+# A aplicação estará disponível em http://localhost:8080/api
+# Use as credenciais admin/change-me para autenticar
+
+# Exemplo de teste com curl
+curl -u admin:change-me http://localhost:8080/api/actuator/health
 ```
 
 ---

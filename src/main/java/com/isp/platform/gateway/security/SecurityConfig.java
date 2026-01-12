@@ -1,5 +1,7 @@
 package com.isp.platform.gateway.security;
 
+import com.isp.platform.gateway.auth.UserAccount;
+import com.isp.platform.gateway.auth.UserAccountRepository;
 import com.isp.platform.gateway.tenant.TenantResolverFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,6 +10,11 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -17,10 +24,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtTokenProvider tokenProvider;
+    private final UserAccountRepository userAccountRepository;
 
-    public SecurityConfig(JwtTokenProvider tokenProvider) {
-        this.tokenProvider = tokenProvider;
+    public SecurityConfig(UserAccountRepository userAccountRepository) {
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Bean
@@ -31,8 +38,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/auth/login", "/auth/refresh").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new TenantResolverFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class);
+                .httpBasic(basic -> {})
+                .addFilterBefore(new TenantResolverFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -44,5 +51,26 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
+    }
+
+    /**
+     * UserDetailsService that loads users from the database.
+     * This replaces the in-memory user configuration with DB-backed authentication.
+     */
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            // Load user from database using efficient query
+            UserAccount userAccount = userAccountRepository.findByUsernameAndEnabled(username, true)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+            return User.builder()
+                    .username(userAccount.getUsername())
+                    .password(userAccount.getPasswordHash())
+                    .authorities(userAccount.getRoles().stream()
+                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                            .toList())
+                    .build();
+        };
     }
 }
