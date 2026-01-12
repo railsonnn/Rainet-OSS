@@ -127,7 +127,7 @@ public class ConfigSnapshotService {
             afterSnapshot.setRouter(router);
             afterSnapshot.setTenantId(router.getTenantId());
             afterSnapshot.setSnapshotType(ConfigSnapshot.SnapshotType.AFTER);
-            afterSnapshot.setDescription(String.format("Rollback to snapshot %d", snapshotId));
+            afterSnapshot.setDescription(String.format("Rollback to snapshot %s", snapshotId));
             afterSnapshot.setConfigScript(beforeSnapshot.getConfigScript());
             afterSnapshot.setConfigHash(beforeSnapshot.getConfigHash());
             afterSnapshot.setAppliedBy(appliedBy);
