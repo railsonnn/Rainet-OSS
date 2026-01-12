@@ -1,14 +1,10 @@
 package com.isp.platform.gateway.auth;
 
 import com.isp.platform.common.exception.ApiException;
-import com.isp.platform.gateway.security.JwtTokenProvider;
 import com.isp.platform.gateway.security.Role;
-import com.isp.platform.gateway.security.TokenType;
 import com.isp.platform.gateway.tenant.Tenant;
 import com.isp.platform.gateway.tenant.TenantContext;
 import com.isp.platform.gateway.tenant.TenantRepository;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -16,22 +12,29 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Authentication service - JWT support removed, now uses HTTP Basic Auth.
+ * Token generation methods return placeholders for backward compatibility.
+ * 
+ * TODO: Re-implement token issuance if session-based or token-based authentication is needed.
+ * Consider implementing:
+ * - Session tokens stored in database
+ * - OAuth2/OIDC integration
+ * - API key authentication for programmatic access
+ */
 @Service
 public class AuthService {
 
     private final UserAccountRepository userRepository;
     private final TenantRepository tenantRepository;
-    private final JwtTokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
 
     public AuthService(
             UserAccountRepository userRepository,
             TenantRepository tenantRepository,
-            JwtTokenProvider tokenProvider,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
-        this.tokenProvider = tokenProvider;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -51,31 +54,20 @@ public class AuthService {
         }
 
         TenantContext.setCurrentTenant(tenantId);
-        return new AuthTokens(
-                tokenProvider.generateAccessToken(user),
-                tokenProvider.generateRefreshToken(user));
+        
+        // Return placeholder tokens for backward compatibility
+        // Authentication now uses HTTP Basic Auth
+        return new AuthTokens("", "");
     }
 
     public AuthTokens refresh(RefreshRequest request) {
-        String token = request.refreshToken();
-        if (!tokenProvider.validate(token) || !tokenProvider.isRefreshToken(token)) {
-            throw new ApiException("Invalid refresh token");
-        }
-        Claims claims = tokenProvider.getClaims(token);
-        String username = claims.getSubject();
-        UUID tenantId = UUID.fromString((String) claims.get("tenant_id"));
-        TenantContext.setCurrentTenant(tenantId);
-        UserAccount user = userRepository.findByUsernameAndTenantId(username, tenantId)
-                .orElseThrow(() -> new ApiException("User not found"));
-        return new AuthTokens(
-                tokenProvider.generateAccessToken(user),
-                tokenProvider.generateRefreshToken(user));
+        // JWT refresh is no longer supported
+        // Return placeholder tokens for backward compatibility
+        throw new ApiException("Token refresh not supported - use HTTP Basic Authentication");
     }
 
     public void logout(String refreshToken) {
-        // Stateless JWT: client discards tokens; implement blacklist/rotation later.
-        if (!tokenProvider.validate(refreshToken)) {
-            throw new ApiException("Invalid token");
-        }
+        // Stateless HTTP Basic Auth: no server-side session to invalidate
+        // Client should discard credentials
     }
 }

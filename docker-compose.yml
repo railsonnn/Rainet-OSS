@@ -15,10 +15,11 @@ services:
     depends_on:
       - db
     environment:
-      DB_URL: jdbc:postgresql://db:5432/rainet
-      DB_USER: rainet
-      DB_PASS: rainet
-      JWT_SECRET: change-me-secret-change-me-secret-change-me
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/rainet
+      SPRING_DATASOURCE_USERNAME: rainet
+      SPRING_DATASOURCE_PASSWORD: rainet
+      SPRING_SERVLET_CONTEXT_PATH: /api
+      JWT_SECRET: deprecated-jwt-removed-use-basic-auth
     ports:
       - "8080:8080"
     command: ["java","-jar","/app/app.jar"]
