@@ -17,11 +17,9 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-security:
-  jwt:
-    secret: "change-me-secret-change-me-secret-change-me"
-    access-ttl-minutes: 15
-    refresh-ttl-minutes: 43200
+server:
+  servlet:
+    context-path: /api
 
 logging:
   level:
@@ -36,10 +34,6 @@ spring:
     url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASS}
-
-security:
-  jwt:
-    secret: ${JWT_SECRET}
 
 logging:
   level:
