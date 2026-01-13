@@ -6,6 +6,7 @@ import com.isp.platform.admin.service.RouterRequest;
 import com.isp.platform.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,16 +23,19 @@ public class AdminController {
         this.adminService = adminService;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @PostMapping("/pops")
     public ResponseEntity<ApiResponse<?>> createPop(@Valid @RequestBody PopRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.createPop(request)));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @PostMapping("/routers")
     public ResponseEntity<ApiResponse<?>> createRouter(@Valid @RequestBody RouterRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.createRouter(request)));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECH')")
     @GetMapping("/routers")
     public ResponseEntity<ApiResponse<?>> listRouters() {
         return ResponseEntity.ok(ApiResponse.ok(adminService.listRouters()));
